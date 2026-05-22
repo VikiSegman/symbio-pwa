@@ -49,7 +49,7 @@ async function searchMemories(embedding) {
 }
 
 async function saveMemory(content, embedding) {
-  if (!embedding || !process.env.SUPABASE_URL) return;
+  if (!embedding || !process.env.SUPABASE_URL) return false;
   const host = new URL(process.env.SUPABASE_URL).hostname;
   const body = JSON.stringify({
     user_id: 'erez',
@@ -58,13 +58,14 @@ async function saveMemory(content, embedding) {
     memory_type: 'conversation',
     session_date: new Date().toISOString().split('T')[0]
   });
-  await httpsPost(host, '/rest/v1/memories', {
+  const r = await httpsPost(host, '/rest/v1/memories', {
     'apikey': process.env.SUPABASE_ANON_KEY,
     'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body),
     'Prefer': 'return=minimal'
   }, body);
+  return r.status === 201;
 }
 
 exports.handler = async (event) => {
@@ -74,7 +75,7 @@ exports.handler = async (event) => {
     const { message, project } = JSON.parse(event.body || '{}');
     if (!message) return { statusCode: 400, body: JSON.stringify({ error: 'No message' }) };
 
-    // Step 1: Search memories (max 4 seconds — skip if slow)
+    // Step 1: Search memories
     let memoryContext = '';
     try {
       const qEmbed = await getEmbedding(message);
@@ -100,7 +101,7 @@ exports.handler = async (event) => {
 
 כללי תגובה (לא ניתנים לשינוי):
 - ברירת מחדל: 1-3 משפטים בלבד. לא יותר אלא אם נשאל.
-- רשימות: 3 מילים לנקודה, מקסימום 5 נקודות.
+- רשימות: 3 מילות לנקודה, מקסימום 5 נקודות.
 - לעולם אל תחזור על מה שנאמר. אל תוסיף ביטויי מילוי.
 - לעולם אל תתחיל ב"כמובן", "שאלה מצוינת", "בוודאי".
 - שפה: ענה באותה שפה שבה השתמש המשתמש.${memoryContext}`;
@@ -124,12 +125,12 @@ exports.handler = async (event) => {
     const reply = data.content?.[0]?.text || data.error?.message || 'אין תגובה';
     console.log('[ask] reply length:', reply.length);
 
-    // Step 3: Store memory (awaited — ensures it completes before Lambda exits)
+    // Step 3: Store memory BEFORE returning (Netlify kills process after return)
     try {
       const content = `User: ${message}\nSymbio: ${reply}`;
       const embedding = await getEmbedding(content);
-      await saveMemory(content, embedding);
-      console.log('[ask] memory stored');
+      const stored = await saveMemory(content, embedding);
+      console.log('[ask] memory stored:', stored);
     } catch(e) {
       console.error('[ask] memory store failed:', e.message);
     }
