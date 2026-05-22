@@ -49,15 +49,17 @@ async function searchMemories(embedding) {
 }
 
 async function saveMemory(content, embedding) {
-  if (!embedding || !process.env.SUPABASE_URL) return false;
+  if (!process.env.SUPABASE_URL) { console.error('[ask] no SUPABASE_URL'); return false; }
   const host = new URL(process.env.SUPABASE_URL).hostname;
-  const body = JSON.stringify({
+  // Send without embedding first to test basic insert
+  const payload = {
     user_id: 'erez',
-    content,
-    embedding,
+    content: content,
     memory_type: 'conversation',
     session_date: new Date().toISOString().split('T')[0]
-  });
+  };
+  if (embedding) payload.embedding = embedding;
+  const body = JSON.stringify(payload);
   const r = await httpsPost(host, '/rest/v1/memories', {
     'apikey': process.env.SUPABASE_ANON_KEY,
     'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
@@ -65,6 +67,7 @@ async function saveMemory(content, embedding) {
     'Content-Length': Buffer.byteLength(body),
     'Prefer': 'return=minimal'
   }, body);
+  console.log('[ask] supabase status:', r.status, 'body:', JSON.stringify(r.body).slice(0, 200));
   return r.status === 201;
 }
 
