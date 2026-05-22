@@ -14,7 +14,7 @@ function httpsPost(hostname, path, headers, body) {
       }
     );
     req.on('error', () => resolve({ status: 500, body: {} }));
-    req.setTimeout(4000, () => { req.destroy(); resolve({ status: 408, body: {} }); });
+    req.setTimeout(15000, () => { req.destroy(); resolve({ status: 408, body: {} }); });
     req.write(body);
     req.end();
   });
@@ -27,6 +27,8 @@ async function getEmbedding(text) {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body)
   }, body);
+  console.log('[ask] embedding status:', r.status, 'has data:', !!r.body.data);
+  console.log('[ask] embedding error:', JSON.stringify(r.body.error || 'none'));
   return r.body.data?.[0]?.embedding || null;
 }
 
