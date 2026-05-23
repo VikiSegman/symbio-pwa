@@ -1,12 +1,12 @@
 // netlify/functions/auth.js
-// Handles signup, login, logout, session check
+// Handles signup, login, logout
 // user_id = firstname_lastname (+ country_city if duplicate)
 
 const SUPABASE_URL    = process.env.SUPABASE_URL;
 const SUPABASE_ANON   = process.env.SUPABASE_ANON_KEY;
-const SUPABASE_SVCKEY = process.env.SUPABASE_SERVICE_KEY; // add to Netlify env
+const SUPABASE_SVCKEY = process.env.SUPABASE_SERVICE_KEY;
 
-// -- helpers ------------------------------------------------------------------
+// ── helpers ────────────────────────────────────────────────────────────────────
 
 function buildUserId(firstName, lastName, country = '', city = '') {
   const base = `${firstName}_${lastName}`
@@ -31,13 +31,10 @@ async function userIdExists(userId) {
 }
 
 async function resolveUniqueUserId(firstName, lastName, country, city) {
-  // Try base first
   const base = buildUserId(firstName, lastName);
   if (!(await userIdExists(base))) return base;
-  // Add location
   const withLocation = buildUserId(firstName, lastName, country, city);
   if (!(await userIdExists(withLocation))) return withLocation;
-  // Last resort: add timestamp suffix
   return `${withLocation}_${Date.now()}`;
 }
 
@@ -54,7 +51,7 @@ async function sbPost(path, body, useServiceKey = false) {
   });
 }
 
-// -- main handler -------------------------------------------------------------
+// ── main handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
   const corsHeaders = {
@@ -74,7 +71,7 @@ exports.handler = async (event) => {
   try {
     const { action, email, password, firstName, lastName, country, city } = JSON.parse(event.body);
 
-    // -- SIGNUP ---------------------------------------------------------------
+    // ── SIGNUP ──────────────────────────────────────────────────────────────────
     if (action === 'signup') {
       if (!email || !password || !firstName || !lastName) {
         return { statusCode: 400, headers: corsHeaders,
@@ -85,15 +82,15 @@ exports.handler = async (event) => {
       const authRes = await sbPost('/auth/v1/signup', { email, password });
       const authData = await authRes.json();
 
-      if (authData.error) {
+      if (authData.error || authData.error_description) {
         return { statusCode: 400, headers: corsHeaders,
-          body: JSON.stringify({ error: authData.error.message || authData.error }) };
+          body: JSON.stringify({ error: authData.error_description || authData.error?.message || authData.error || 'Signup failed' }) };
       }
 
       const supabaseUid = authData.user?.id;
       if (!supabaseUid) {
         return { statusCode: 500, headers: corsHeaders,
-          body: JSON.stringify({ error: 'Auth user creation failed' }) };
+          body: JSON.stringify({ error: 'Auth user creation failed — no UID returned' }) };
       }
 
       // 2. Generate unique user_id from name
@@ -127,13 +124,15 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           success: true,
           userId,
+          firstName,
+          tier: 'starter',
           supabaseUid,
           session: authData.session
         })
       };
     }
 
-    // -- LOGIN ----------------------------------------------------------------
+    // ── LOGIN ───────────────────────────────────────────────────────────────────
     if (action === 'login') {
       if (!email || !password) {
         return { statusCode: 400, headers: corsHeaders,
@@ -143,14 +142,26 @@ exports.handler = async (event) => {
       const authRes = await sbPost('/auth/v1/token?grant_type=password', { email, password });
       const authData = await authRes.json();
 
-      if (authData.error) {
+      // Handle all Supabase error formats
+      if (authData.error || authData.error_description || !authData.access_token) {
         return { statusCode: 401, headers: corsHeaders,
           body: JSON.stringify({ error: 'Invalid email or password' }) };
       }
 
-      // Fetch profile to get user_id and tier
+      // Get user info via /auth/v1/user (more reliable than authData.user)
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${authData.access_token}` }
+      });
+      const userData = await userRes.json();
+
+      if (!userData || !userData.id) {
+        return { statusCode: 401, headers: corsHeaders,
+          body: JSON.stringify({ error: 'Could not retrieve user info' }) };
+      }
+
+      // Fetch profile for user_id and tier
       const profileRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/user_profiles?supabase_uid=eq.${authData.user.id}&select=user_id,tier,first_name`,
+        `${SUPABASE_URL}/rest/v1/user_profiles?supabase_uid=eq.${userData.id}&select=user_id,tier,first_name`,
         { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${authData.access_token}` } }
       );
       const profiles = await profileRes.json();
@@ -161,21 +172,18 @@ exports.handler = async (event) => {
         headers: corsHeaders,
         body: JSON.stringify({
           success: true,
-          userId: profile.user_id,
-          firstName: profile.first_name,
+          userId: profile.user_id || userData.email,
+          firstName: profile.first_name || '',
           tier: profile.tier || 'starter',
           session: authData
         })
       };
     }
 
-    // -- LOGOUT ---------------------------------------------------------------
+    // ── LOGOUT ──────────────────────────────────────────────────────────────────
     if (action === 'logout') {
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ success: true })
-      };
+      return { statusCode: 200, headers: corsHeaders,
+        body: JSON.stringify({ success: true }) };
     }
 
     return { statusCode: 400, headers: corsHeaders,
