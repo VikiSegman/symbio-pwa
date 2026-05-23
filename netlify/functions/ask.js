@@ -171,10 +171,10 @@ exports.handler = async (event) => {
     console.log(`[ask] reply:${reply.length} | memories:${memories.length} | people:${relevantPeople.length} | financial:${!!financialContext}`);
 
     const content = `User: ${message}\nSymbio: ${reply}`;
-    getEmbedding(content).then(emb=>{
-      saveMemory(content,emb).then(s=>console.log('[ask] memory stored:',s));
-      autoDetectPerson(message,reply);
-    });
+    const memEmb = await getEmbedding(content);
+    const stored = await saveMemory(content, memEmb);
+    console.log('[ask] memory stored:', stored);
+    await autoDetectPerson(message, reply);
 
     return {statusCode:200,headers:{'Content-Type':'application/json'},body:JSON.stringify({reply})};
   } catch(error) {
