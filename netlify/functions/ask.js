@@ -1,113 +1,196 @@
 const https = require('https');
 
-function httpsPost(hostname, path, headers, body) {
+// ── Supabase GET helper ──────────────────────────────────────────────────
+function supabaseGet(path) {
   return new Promise((resolve) => {
-    const req = https.request(
-      { hostname, path, method: 'POST', headers },
-      (res) => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => {
-          try { resolve({ status: res.statusCode, body: JSON.parse(d) }); }
-          catch(e) { resolve({ status: res.statusCode, body: {} }); }
-        });
+    if (!process.env.SUPABASE_URL) return resolve([]);
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const req = https.request({
+      hostname: host, path, method: 'GET',
+      headers: {
+        'apikey': process.env.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
       }
-    );
-    req.on('error', () => resolve({ status: 500, body: {} }));
-    req.setTimeout(15000, () => { req.destroy(); resolve({ status: 408, body: {} }); });
-    req.write(body);
+    }, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d) || []); } catch(e) { resolve([]); } });
+    });
+    req.on('error', () => resolve([]));
+    req.setTimeout(5000, () => { req.destroy(); resolve([]); });
     req.end();
   });
 }
 
-async function getEmbedding(text) {
-  const body = JSON.stringify({ model: 'text-embedding-3-small', input: text.slice(0, 4000) });
-  const r = await httpsPost('api.openai.com', '/v1/embeddings', {
-    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body)
-  }, body);
-  return r.body.data?.[0]?.embedding || null;
+// ── Supabase POST/PATCH helper ───────────────────────────────────────────
+function supabasePost(path, body, method) {
+  return new Promise((resolve) => {
+    if (!process.env.SUPABASE_URL) return resolve({ status: 500 });
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const bodyStr = JSON.stringify(body);
+    const req = https.request({
+      hostname: host, path, method: method || 'POST',
+      headers: {
+        'apikey': process.env.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyStr),
+        'Prefer': 'return=minimal'
+      }
+    }, (res) => { res.on('data', () => {}); res.on('end', () => resolve({ status: res.statusCode })); });
+    req.on('error', () => resolve({ status: 500 }));
+    req.setTimeout(8000, () => { req.destroy(); resolve({ status: 408 }); });
+    req.write(bodyStr); req.end();
+  });
 }
 
+// ── OpenAI embed ─────────────────────────────────────────────────────────
+function getEmbedding(text) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({ model: 'text-embedding-3-small', input: text.slice(0, 4000) });
+    const req = https.request({
+      hostname: 'api.openai.com', path: '/v1/embeddings', method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(d).data?.[0]?.embedding || null); }
+        catch(e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(15000, () => { req.destroy(); resolve(null); });
+    req.write(body); req.end();
+  });
+}
+
+// ── Search memories ──────────────────────────────────────────────────────
 async function searchMemories(embedding) {
   if (!embedding || !process.env.SUPABASE_URL) return [];
   const host = new URL(process.env.SUPABASE_URL).hostname;
   const body = JSON.stringify({
-    query_embedding: embedding,
-    match_threshold: 0.70,
-    match_count: 5,
-    filter_user_id: 'erez'
+    query_embedding: embedding, match_threshold: 0.70,
+    match_count: 5, filter_user_id: 'erez'
   });
-  const r = await httpsPost(host, '/rest/v1/rpc/match_memories', {
-    'apikey': process.env.SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body)
-  }, body);
-  return Array.isArray(r.body) ? r.body : [];
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: host, path: '/rest/v1/rpc/match_memories', method: 'POST',
+      headers: {
+        'apikey': process.env.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d) || []); } catch(e) { resolve([]); } });
+    });
+    req.on('error', () => resolve([]));
+    req.setTimeout(5000, () => { req.destroy(); resolve([]); });
+    req.write(body); req.end();
+  });
 }
 
+// ── Save memory ──────────────────────────────────────────────────────────
 async function saveMemory(content, embedding) {
-  if (!process.env.SUPABASE_URL) { console.error('[ask] no SUPABASE_URL'); return false; }
+  if (!embedding || !process.env.SUPABASE_URL) return false;
   const host = new URL(process.env.SUPABASE_URL).hostname;
-  // Send without embedding first to test basic insert
-  const payload = {
-    user_id: 'erez',
-    content: content,
+  const body = JSON.stringify({
+    user_id: 'erez', content, embedding,
     memory_type: 'conversation',
     session_date: new Date().toISOString().split('T')[0]
-  };
-  if (embedding) payload.embedding = embedding;
-  const body = JSON.stringify(payload);
-  const r = await httpsPost(host, '/rest/v1/memories', {
-    'apikey': process.env.SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body),
-    'Prefer': 'return=minimal'
-  }, body);
-  console.log('[ask] supabase status:', r.status, 'body:', JSON.stringify(r.body).slice(0, 200));
-  return r.status === 201;
+  });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: host, path: '/rest/v1/memories', method: 'POST',
+      headers: {
+        'apikey': process.env.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'Prefer': 'return=minimal'
+      }
+    }, (res) => { res.on('data', () => {}); res.on('end', () => resolve(res.statusCode === 201)); });
+    req.on('error', () => resolve(false));
+    req.setTimeout(8000, () => { req.destroy(); resolve(false); });
+    req.write(body); req.end();
+  });
 }
 
+// ── Social graph: get relevant people ────────────────────────────────────
+async function getRelevantPeople(message) {
+  try {
+    const all = await supabaseGet(
+      '/rest/v1/people?user_id=eq.erez&order=updated_at.desc&limit=30'
+    );
+    if (!Array.isArray(all) || all.length === 0) return [];
+    const msgLower = message.toLowerCase();
+    return all.filter(p => {
+      const names = [p.name, ...(p.name_variants || [])];
+      return names.some(n => n && msgLower.includes(n.toLowerCase()));
+    }).slice(0, 3);
+  } catch(e) { return []; }
+}
+
+// ── Social graph: update last contact ────────────────────────────────────
+async function updateLastContact(personName) {
+  if (!process.env.SUPABASE_URL) return;
+  try {
+    await supabasePost(
+      `/rest/v1/people?user_id=eq.erez&name=ilike.*${encodeURIComponent(personName)}*`,
+      { last_contact: new Date().toISOString().split('T')[0] },
+      'PATCH'
+    );
+  } catch(e) {}
+}
+
+// ── Main handler ─────────────────────────────────────────────────────────
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Not Allowed' };
 
   try {
     const { message, project } = JSON.parse(event.body || '{}');
     if (!message) return { statusCode: 400, body: JSON.stringify({ error: 'No message' }) };
 
-    // Step 1: Search memories
+    // Step 1: Parallel — embeddings + social graph
+    const [qEmbed, relevantPeople] = await Promise.all([
+      getEmbedding(message),
+      getRelevantPeople(message)
+    ]);
+
+    const memories = qEmbed ? await searchMemories(qEmbed) : [];
+
+    // Step 2: Build context
     let memoryContext = '';
-    try {
-      const qEmbed = await getEmbedding(message);
-      const memories = await searchMemories(qEmbed);
-      if (memories.length > 0) {
-        memoryContext = '\n\nזיכרונות רלוונטיים משיחות קודמות:\n' +
-          memories.map((m, i) =>
-            `[זיכרון ${i+1} — ${m.session_date || 'עבר'}]\n${m.content}`
-          ).join('\n\n') +
-          '\n\nהשתמש בזיכרונות אלה להקשר. אל תחזור עליהם מילה במילה.';
-        console.log('[ask] memories found:', memories.length);
-      }
-    } catch(e) {
-      console.error('[ask] memory search failed:', e.message);
+    if (memories.length > 0) {
+      memoryContext = '\n\nזיכרונות רלוונטיים משיחות קודמות:\n' +
+        memories.map((m, i) =>
+          `[זיכרון ${i+1} — ${m.session_date || 'עבר'}]\n${m.content}`
+        ).join('\n\n') + '\n';
     }
 
-    // Step 2: Call Claude
-    const system = `אתה סימביו — מערכת ה-AI האישית של ארז סגמן (Erez Segman).
-ישיר, חד, דו-לשוני עברית/אנגלית. פעל כיועץ בכיר מהימן שמכיר את כל עולמו של ארז.
+    let peopleContext = '';
+    if (relevantPeople.length > 0) {
+      peopleContext = '\n\nאנשים רלוונטיים שהוזכרו:\n' +
+        relevantPeople.map(p =>
+          `• ${p.name} — ${p.role || ''} | ${p.relationship_type || ''} | ${p.company || ''} | רמת אמון: ${p.trust_level}/10 | ${p.current_situation || ''} | ${p.notes || ''}`
+        ).join('\n') + '\n';
+      relevantPeople.forEach(p => updateLastContact(p.name));
+    }
 
-פרויקט פעיל: ${project || 'כללי'}.
-מטרות: 100K ש"ח/חודש — Financia (פיתוח נדל"ן, בת ים תמא 38/2, הרצליה), Lotar (הדרכת מ"א, חוות לוטר, אפריקה), ייעוץ משכנתאות (2% מינ׳ 12,500 ש"ח), AAF (תרומות), Tax Liens ארה"ב (Baltimore 18%+).
+    // Step 3: Call Claude
+    const system = `אתה סימביו — מערכת ה-AI האישית של ארז סגמן (Erez Segman). ישיר, חד, דו-לשוני עברית/אנגלית. פעל כיועץ בכיר מהימן.
 
-כללי תגובה (לא ניתנים לשינוי):
-- ברירת מחדל: 1-3 משפטים בלבד. לא יותר אלא אם נשאל.
-- רשימות: 3 מילות לנקודה, מקסימום 5 נקודות.
-- לעולם אל תחזור על מה שנאמר. אל תוסיף ביטויי מילוי.
-- לעולם אל תתחיל ב"כמובן", "שאלה מצוינת", "בוודאי".
-- שפה: ענה באותה שפה שבה השתמש המשתמש.${memoryContext}`;
+פרויקט פעיל: ${project || 'כללי'}. מטרות: 100K ש"ח/חודש — Financia (בת ים תמא 38/2, הרצליה), Lotar (הדרכות, אפריקה, חוות), ייעוץ משכנתאות (2% מינ׳ 12,500 ש"ח), AAF (תרומות), Tax Liens ארה"ב.
+
+כללי תגובה:
+- 1-3 משפטים בלבד. רשימות: 3 מילות לנקודה, מקסימום 5.
+- אל תחזור. אל תמלא. אל תתחיל ב"כמובן"/"בוודאי".
+- שפה: אותה שפה כמו המשתמש.${memoryContext}${peopleContext}`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -126,9 +209,9 @@ exports.handler = async (event) => {
 
     const data = await res.json();
     const reply = data.content?.[0]?.text || data.error?.message || 'אין תגובה';
-    console.log('[ask] reply length:', reply.length);
+    console.log('[ask] reply length:', reply.length, '| memories:', memories.length, '| people:', relevantPeople.length);
 
-    // Step 3: Store memory BEFORE returning (Netlify kills process after return)
+    // Step 4: Store memory
     try {
       const content = `User: ${message}\nSymbio: ${reply}`;
       const embedding = await getEmbedding(content);
