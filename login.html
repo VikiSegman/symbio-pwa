@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symbio — Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #08091A;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+    .logo {
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .tagline {
+      text-align: center;
+      color: #666;
+      font-size: 0.85rem;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: #111;
+      border: 1px solid #1e1e1e;
+      border-radius: 16px;
+      padding: 32px;
+    }
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 28px;
+      background: #0a0a0a;
+      border-radius: 8px;
+      padding: 4px;
+    }
+    .tab {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border-radius: 6px;
+      color: #666;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: #7B6FFF;
+      color: #fff;
+      font-weight: 600;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 0.78rem;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 11px 14px;
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #7B6FFF; }
+    .row { display: flex; gap: 12px; }
+    .row .form-group { flex: 1; }
+    .btn {
+      width: 100%;
+      padding: 13px;
+      background: #7B6FFF;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover { background: #6a5fe8; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { background: #333; cursor: not-allowed; }
+    .error {
+      color: #ff6b6b;
+      font-size: 0.8rem;
+      margin-top: 12px;
+      text-align: center;
+      min-height: 20px;
+    }
+    .divider {
+      text-align: center;
+      color: #444;
+      font-size: 0.75rem;
+      margin: 16px 0;
+    }
+    .pricing-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .pricing-link a {
+      color: #7B6FFF;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">SYMBIO</div>
+    <div class="tagline">Your second brain. Always on.</div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" id="tab-login" onclick="switchTab('login')">Sign In</div>
+        <div class="tab" id="tab-signup" onclick="switchTab('signup')">Create Account</div>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="form-login">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn" id="login-btn" onclick="doLogin()">Sign In →</button>
+        <div class="error" id="login-error"></div>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="form-signup" style="display:none">
+        <div class="row">
+          <div class="form-group">
+            <label>First Name</label>
+            <input type="text" id="signup-first" placeholder="John">
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" id="signup-last" placeholder="Smith">
+          </div>
+        </div>
+        <div class="row">
+          <div class="form-group">
+            <label>Country</label>
+            <input type="text" id="signup-country" placeholder="Israel">
+          </div>
+          <div class="form-group">
+            <label>City</label>
+            <input type="text" id="signup-city" placeholder="Tel Aviv">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="signup-password" placeholder="Min 8 characters" autocomplete="new-password">
+        </div>
+        <button class="btn" id="signup-btn" onclick="doSignup()">Create My Symbio →</button>
+        <div class="error" id="signup-error"></div>
+      </div>
+    </div>
+
+    <div class="pricing-link">
+      Don't have an account? <a href="/pricing.html">See plans →</a>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('form-signup').style.display = tab === 'signup' ? 'block' : 'none';
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+    }
+
+    // Check if already logged in
+    window.addEventListener('load', () => {
+      const session = localStorage.getItem('symbio_session');
+      const userId = localStorage.getItem('symbio_user_id');
+      if (session && userId) {
+        window.location.href = '/index.html';
+      }
+      // Auto-switch to signup if coming from pricing
+      if (document.referrer.includes('pricing')) {
+        switchTab('signup');
+      }
+    });
+
+    async function doLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+
+      errEl.textContent = '';
+      if (!email || !password) { errEl.textContent = 'Please enter email and password.'; return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+
+      try {
+        const res = await fetch('/.netlify/functions/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'login', email, password })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          errEl.textContent = data.error;
+          btn.disabled = false;
+          btn.textContent = 'Sign In →';
+          return;
+        }
+
+        // Save session
+        localStorage.setItem('symbio_user_id', data.userId);
+        localStorage.setItem('symbio_first_name', data.firstName);
+        localStorage.setItem('symbio_tier', data.tier);
+        localStorage.setItem('symbio_session', JSON.stringify(data.session));
+
+        window.location.href = '/index.html';
+
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Sign In →';
+      }
+    }
+
+    async function doSignup() {
+      const firstName = document.getElementById('signup-first').value.trim();
+      const lastName = document.getElementById('signup-last').value.trim();
+      const country = document.getElementById('signup-country').value.trim();
+      const city = document.getElementById('signup-city').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const errEl = document.getElementById('signup-error');
+      const btn = document.getElementById('signup-btn');
+
+      errEl.textContent = '';
+
+      if (!firstName || !lastName || !email || !password) {
+        errEl.textContent = 'First name, last name, email and password are required.';
+        return;
+      }
+      if (password.length < 8) {
+        errEl.textContent = 'Password must be at least 8 characters.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating your Symbio...';
+
+      try {
+        const res = await fetch('/.netlify/functions/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'signup', email, password, firstName, lastName, country, city })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          errEl.textContent = data.error;
+          btn.disabled = false;
+          btn.textContent = 'Create My Symbio →';
+          return;
+        }
+
+        // Save session
+        localStorage.setItem('symbio_user_id', data.userId);
+        localStorage.setItem('symbio_first_name', firstName);
+        localStorage.setItem('symbio_tier', 'starter');
+        localStorage.setItem('symbio_session', JSON.stringify(data.session));
+
+        window.location.href = '/index.html';
+
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Create My Symbio →';
+      }
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      const loginVisible = document.getElementById('form-login').style.display !== 'none';
+      if (loginVisible) doLogin(); else doSignup();
+    });
+  </script>
+</body>
+</html>
