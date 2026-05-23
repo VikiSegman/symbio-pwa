@@ -27,8 +27,6 @@ async function getEmbedding(text) {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body)
   }, body);
-  console.log('[ask] embedding status:', r.status, 'has data:', !!r.body.data);
-  console.log('[ask] embedding error:', JSON.stringify(r.body.error || 'none'));
   return r.body.data?.[0]?.embedding || null;
 }
 
