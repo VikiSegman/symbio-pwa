@@ -186,9 +186,7 @@
           <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Basic task tracking</li>
           <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Symbio branding</li>
         </ul>
-        <div class="paypal-btn-wrap">
-          <button class="plan-free-btn" onclick="startFree()">Start Remembering →</button>
-        </div>
+        <div class="paypal-btn-wrap" id="paypal-starter"></div>
       </div>
 
       <!-- PERSONAL -->
@@ -257,6 +255,7 @@
 
       script.onload = () => {
         loading.textContent = '';
+        renderPayPalButton('paypal-starter',  plans.starter,  'starter');
         renderPayPalButton('paypal-personal', plans.personal, 'personal');
         renderPayPalButton('paypal-pro',      plans.pro,      'pro');
       };
