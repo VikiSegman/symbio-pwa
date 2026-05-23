@@ -139,6 +139,18 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 </div>
 </div>
 <script>
+// Auth guard — redirect to login if no session (skip for erez)
+const _uid = localStorage.getItem('symbio_user_id');
+const _ses = localStorage.getItem('symbio_session');
+if (!_uid && !_ses) { window.location.href = '/login.html'; }
+// Show plan tier in header
+const _tier = localStorage.getItem('symbio_tier') || 'starter';
+const _upgradeBtn = document.querySelector('.upgrade-btn') || document.getElementById('upgrade-btn');
+if (_upgradeBtn) {
+  if (_tier === 'pro') { _upgradeBtn.textContent = '⚡ Pro'; _upgradeBtn.style.background='#f0a500'; _upgradeBtn.style.cursor='default'; _upgradeBtn.onclick=null; }
+  else if (_tier === 'personal') { _upgradeBtn.textContent = '● Personal'; _upgradeBtn.style.background='#4A90E2'; }
+}
+
 // Clock
 function tick(){var n=new Date();document.getElementById('clk').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
 
