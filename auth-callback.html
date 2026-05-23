@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Symbio — Connecting...</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #08091A; color: #fff; font-family: -apple-system, sans-serif;
+min-height: 100vh; display: flex; align-items: center; justify-content: center;
+flex-direction: column; gap: 16px; }
+.logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.2em; }
+.msg { color: #888; font-size: 0.9rem; }
+.err { color: #ff6b6b; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="logo">SYMBIO</div>
+<div class="msg" id="msg">Connecting your account...</div>
+<div class="err" id="err"></div>
+<script>
+(async () => {
+try {
+const cfgRes = await fetch('/.netlify/functions/config');
+const cfg = await cfgRes.json();
+const SUPABASE_URL = cfg.supabaseUrl;
+const SUPABASE_ANON = cfg.supabaseAnon;
+const params = new URLSearchParams(window.location.hash.substring(1));
+const accessToken = params.get('access_token');
+const refreshToken = params.get('refresh_token');
+if (!accessToken) {
+document.getElementById('err').textContent = 'OAuth failed — no token. Redirecting...';
+setTimeout(() => window.location.href = '/login.html', 2000);
+return;
+}
+const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${accessToken}` }
+});
+const userData = await userRes.json();
+if (!userData?.id) {
+document.getElementById('err').textContent = 'Could not retrieve user. Redirecting...';
+setTimeout(() => window.location.href = '/login.html', 2000);
+return;
+}
+const profileRes = await fetch(
+`${SUPABASE_URL}/rest/v1/user_profiles?supabase_uid=eq.${userData.id}&select=user_id,tier,first_name`,
+{ headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${accessToken}` } }
+);
+const profiles = await profileRes.json();
+let profile = profiles[0];
+if (!profile) {
+const email = userData.email || '';
+const nameParts = (userData.user_metadata?.full_name || email.split('@')[0]).split(' ');
+const firstName = nameParts[0] || 'User';
+const lastName = nameParts.slice(1).join(' ') || '';
+const userId = `${firstName}_${lastName}`.toLowerCase()
+.replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') + '_' + Date.now();
+await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
+method: 'POST',
+headers: {
+apikey: SUPABASE_ANON, Authorization: `Bearer ${accessToken}`,
+'Content-Type': 'application/json', Prefer: 'return=minimal'
+},
+body: JSON.stringify({
+supabase_uid: userData.id, user_id: userId,
+first_name: firstName, last_name: lastName,
+email, country: '', city: '', tier: 'starter',
+created_at: new Date().toISOString()
+})
+});
+profile = { user_id: userId, first_name: firstName, tier: 'starter' };
+}
+localStorage.setItem('symbio_user_id', profile.user_id);
+localStorage.setItem('symbio_first_name', profile.first_name || '');
+localStorage.setItem('symbio_tier', profile.tier || 'starter');
+localStorage.setItem('symbio_session', JSON.stringify({ access_token: accessToken, refresh_token: refreshToken }));
+document.getElementById('msg').textContent = `Welcome, ${profile.first_name || 'back'}! Loading...`;
+setTimeout(() => window.location.href = '/', 800);
+} catch (err) {
+document.getElementById('err').textContent = 'Error: ' + err.message;
+setTimeout(() => window.location.href = '/login.html', 2000);
+}
+})();
+</script>
+</body>
+</html>
