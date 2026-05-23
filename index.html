@@ -70,6 +70,10 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 .ld-err{color:rgba(255,120,120,.7);font-size:11px;padding:10px;text-align:center;}
 .ld-load{color:rgba(255,255,255,.25);font-size:11px;padding:10px;text-align:center;}
 .ld-val{color:#22D49A;font-weight:600;}
+
+#tierBadge{display:inline-flex;align-items:center;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;line-height:1;text-decoration:none;flex-shrink:0}
+#tierBadge.tier-pro{background:rgba(240,165,0,.15);color:#f0a500;border:1px solid rgba(240,165,0,.35)}
+#tierBadge.tier-personal{background:rgba(30,120,255,.15);color:#5599ff;border:1px solid rgba(30,120,255,.35)}
 </style>
 </head>
 <body>
@@ -137,7 +141,29 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 <script>
 // Clock
 function tick(){var n=new Date();document.getElementById('clk').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
+
 tick();setInterval(tick,1000);
+
+// Tier badge: read symbio_tier from localStorage and update header
+(function applyTierBadge(){
+  var tier = localStorage.getItem('symbio_tier');
+  var btn = document.getElementById('upgBtn');
+  if(!btn) return;
+  if(tier === 'pro'){
+    btn.id = 'tierBadge';
+    btn.className = 'tier-pro';
+    btn.removeAttribute('href');
+    btn.textContent = '⚡ Pro';
+    btn.onclick = null;
+  } else if(tier === 'personal'){
+    btn.id = 'tierBadge';
+    btn.className = 'tier-personal';
+    btn.removeAttribute('href');
+    btn.textContent = '● Personal';
+    btn.onclick = null;
+  }
+  // starter or null → keep upgBtn as-is
+})();
 
 // Dot pulse
 setInterval(function(){var d=document.getElementById('sdot');if(d){d.style.transform='scale(1.6)';setTimeout(function(){d.style.transform='scale(1)'},300)}},2500);
@@ -1056,7 +1082,7 @@ function renderPayPalButton(containerId,planId,tier){
       try{
         const res=await fetch('/.netlify/functions/paypal-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriptionId:data.subscriptionID,userId})});
         const result=await res.json();
-        if(result.success){document.getElementById('pricing').innerHTML='<div style="text-align:center;padding:60px;color:#fff"><h2 style="color:#6c47ff">✓ Welcome to Symbio '+result.tier.charAt(0).toUpperCase()+result.tier.slice(1)+'</h2><p style="color:#888">Your account is now active.</p></div>';setTimeout(()=>location.reload(),2000);}
+        if(result.success){localStorage.setItem('symbio_tier',result.tier);document.getElementById('pricing').innerHTML='<div style="text-align:center;padding:60px;color:#fff"><h2 style="color:#6c47ff">✓ Welcome to Symbio '+result.tier.charAt(0).toUpperCase()+result.tier.slice(1)+'</h2><p style="color:#888">Your account is now active.</p></div>';setTimeout(()=>location.reload(),2000);}
         else{alert('Subscription verification failed.');}
       }catch(err){console.error(err);alert('Something went wrong.');}
     },
