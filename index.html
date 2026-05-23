@@ -1090,7 +1090,7 @@ function renderPayPalButton(containerId,planId,tier){
     style:{shape:'rect',color:tier==='pro'?'gold':'blue',layout:'vertical',label:'subscribe'},
     createSubscription:(data,actions)=>actions.subscription.create({plan_id:planId}),
     onApprove:async(data)=>{
-      const userId=window.symbioUserId||'erez';
+      const userId=window.symbioUserId||localStorage.getItem('symbio_user_id') || 'erez';
       try{
         const res=await fetch('/.netlify/functions/paypal-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriptionId:data.subscriptionID,userId})});
         const result=await res.json();
