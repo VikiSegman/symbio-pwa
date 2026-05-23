@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080612">
+  <title>Symbio — Pricing</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100%;background:#08091A;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:#E8E8F0}
+
+    /* ── TOP NAV ── */
+    .top-nav{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:14px 24px;
+      border-bottom:1px solid rgba(255,255,255,.07);
+      background:#08091A;
+      position:sticky;top:0;z-index:100;
+    }
+    .back-btn{
+      display:inline-flex;align-items:center;gap:7px;
+      background:rgba(255,255,255,.07);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:8px;
+      color:#E8E8F0;
+      font-size:13px;font-weight:500;
+      padding:8px 16px;
+      text-decoration:none;
+      transition:background .18s,border-color .18s;
+    }
+    .back-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22)}
+    .back-btn svg{width:15px;height:15px;fill:none;stroke:#E8E8F0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .nav-logo{font-size:13px;font-weight:700;letter-spacing:.18em;color:#E8E8F0}
+    .nav-spacer{width:100px}
+
+    /* ── HERO ── */
+    .hero{
+      text-align:center;
+      padding:64px 20px 40px;
+    }
+    .hero h1{
+      font-size:2.6rem;font-weight:800;
+      background:linear-gradient(135deg,#E8E8F0 30%,#7B6FFF);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      margin-bottom:12px;line-height:1.15;
+    }
+    .hero p{
+      color:rgba(255,255,255,.45);
+      font-size:1.05rem;max-width:480px;margin:0 auto;
+      line-height:1.6;
+    }
+
+    /* ── PRICING GRID ── */
+    .pricing-wrap{
+      padding:0 20px 80px;
+      max-width:1020px;margin:0 auto;
+    }
+    .pricing-grid{
+      display:flex;gap:24px;justify-content:center;flex-wrap:wrap;
+    }
+    .plan-card{
+      background:#0E0F1E;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:38px 30px 32px;
+      width:300px;
+      position:relative;
+      transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease;
+    }
+    .plan-card:hover{
+      transform:translateY(-5px);
+      border-color:rgba(255,255,255,.18);
+      box-shadow:0 12px 40px rgba(0,0,0,.35);
+    }
+    .plan-card.popular{
+      border-color:#7B6FFF;
+      box-shadow:0 0 40px rgba(123,111,255,.18);
+    }
+    .plan-card.popular:hover{
+      box-shadow:0 12px 48px rgba(123,111,255,.3);
+    }
+
+    /* badge */
+    .badge{
+      position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+      background:linear-gradient(90deg,#6C47FF,#9B6FFF);
+      color:#fff;font-size:0.68rem;font-weight:700;
+      padding:4px 16px;border-radius:20px;
+      letter-spacing:.08em;text-transform:uppercase;
+      white-space:nowrap;
+    }
+
+    .plan-name{font-size:1.1rem;font-weight:700;color:#E8E8F0;margin-bottom:4px}
+    .plan-tagline{font-size:0.78rem;color:#7B6FFF;margin-bottom:22px;font-style:italic;min-height:18px}
+
+    .plan-price{
+      font-size:2.6rem;font-weight:800;color:#E8E8F0;
+      margin-bottom:4px;line-height:1;
+    }
+    .plan-price sup{font-size:1rem;font-weight:500;vertical-align:top;margin-top:8px;display:inline-block}
+    .plan-price .per{font-size:0.9rem;font-weight:400;color:rgba(255,255,255,.35)}
+
+    .plan-desc{
+      font-size:0.82rem;color:rgba(255,255,255,.45);
+      margin:16px 0 22px;line-height:1.65;min-height:56px;
+    }
+
+    .divider{border:none;border-top:1px solid rgba(255,255,255,.06);margin:0 0 22px}
+
+    .plan-features{list-style:none;padding:0;margin:0 0 28px}
+    .plan-features li{
+      font-size:0.82rem;color:rgba(255,255,255,.6);
+      padding:6px 0;display:flex;align-items:center;gap:8px;
+    }
+    .plan-features li .check{
+      flex-shrink:0;width:16px;height:16px;border-radius:50%;
+      background:rgba(123,111,255,.2);display:flex;align-items:center;justify-content:center;
+    }
+    .plan-features li .check svg{width:9px;height:9px;fill:none;stroke:#7B6FFF;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+    .paypal-btn-wrap{min-height:50px}
+
+    .plan-free-btn{
+      width:100%;padding:13px;
+      background:rgba(255,255,255,.08);
+      color:#E8E8F0;
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:10px;font-size:0.9rem;font-weight:500;
+      cursor:pointer;transition:background .18s,border-color .18s;
+      font-family:inherit;
+    }
+    .plan-free-btn:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.25)}
+
+    #pricing-loading{color:rgba(255,255,255,.3);font-size:0.83rem;text-align:center;margin-top:28px;min-height:24px}
+    #pricing-err{color:#FF6B6B;font-size:0.8rem;text-align:center;margin-top:12px}
+
+    /* ── FOOTER ── */
+    .pricing-footer{
+      text-align:center;padding:28px 20px 48px;
+      color:rgba(255,255,255,.22);font-size:0.78rem;line-height:1.8;
+    }
+    .pricing-footer a{color:rgba(123,111,255,.7);text-decoration:none}
+    .pricing-footer a:hover{color:#7B6FFF}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:680px){
+      .hero h1{font-size:2rem}
+      .plan-card{width:100%;max-width:360px}
+      .nav-spacer{width:60px}
+      .back-btn{font-size:12px;padding:7px 12px}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAV -->
+  <nav class="top-nav">
+    <a class="back-btn" href="index.html">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Symbio
+    </a>
+    <span class="nav-logo">SYMBIO</span>
+    <div class="nav-spacer"></div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Choose Your Symbio</h1>
+    <p>Your second brain. Start free, upgrade when you feel the difference.</p>
+  </div>
+
+  <!-- PRICING -->
+  <div class="pricing-wrap">
+    <div class="pricing-grid">
+
+      <!-- STARTER -->
+      <div class="plan-card" id="card-starter">
+        <div class="plan-name">Symbio Starter</div>
+        <div class="plan-tagline">"היית אמור לזכור את זה"</div>
+        <div class="plan-price">Free<span class="per"></span></div>
+        <p class="plan-desc">Try it. Feel what it's like when something actually remembers you. No card. No commitment.</p>
+        <hr class="divider">
+        <ul class="plan-features">
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>30-day conversation memory</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>1 project</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Basic task tracking</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Symbio branding</li>
+        </ul>
+        <div class="paypal-btn-wrap">
+          <button class="plan-free-btn" onclick="startFree()">Get Started Free →</button>
+        </div>
+      </div>
+
+      <!-- PERSONAL -->
+      <div class="plan-card popular" id="card-personal">
+        <div class="badge">Most Popular</div>
+        <div class="plan-name">Symbio Personal</div>
+        <div class="plan-tagline">"סוף סוף מישהו שמבין אותך"</div>
+        <div class="plan-price"><sup>₪</sup>18<span class="per">/month</span></div>
+        <p class="plan-desc">Full memory. All your projects. Calendar sync and WhatsApp — connected to your actual life.</p>
+        <hr class="divider">
+        <ul class="plan-features">
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Unlimited memory</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>5 projects</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Calendar sync</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>WhatsApp integration</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>No Symbio branding</li>
+        </ul>
+        <div class="paypal-btn-wrap" id="paypal-personal"></div>
+      </div>
+
+      <!-- PRO -->
+      <div class="plan-card" id="card-pro">
+        <div class="plan-name">Symbio Pro</div>
+        <div class="plan-tagline">"הביזנס שלך חושב — הכלים שלך גם"</div>
+        <div class="plan-price"><sup>₪</sup>29<span class="per">/month</span></div>
+        <p class="plan-desc">Business intelligence. CRM. Financial tracking. It doesn't wait to be asked — it tells you what's urgent.</p>
+        <hr class="divider">
+        <ul class="plan-features">
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Everything in Personal</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Multi-user access</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>CRM + lead scoring</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Financial nervous system</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Make.com automation</li>
+          <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>API access</li>
+        </ul>
+        <div class="paypal-btn-wrap" id="paypal-pro"></div>
+      </div>
+
+    </div>
+    <p id="pricing-loading"></p>
+    <p id="pricing-err"></p>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="pricing-footer">
+    <div>Payments secured by PayPal · Cancel anytime · Prices in ILS (₪)</div>
+    <div style="margin-top:6px">Questions? Ask Symbio directly — <a href="index.html">open the app</a></div>
+  </footer>
+
+  <script>
+  (async function initPricing() {
+    const loading = document.getElementById('pricing-loading');
+    const errEl   = document.getElementById('pricing-err');
+    loading.textContent = 'Loading payment options...';
+
+    try {
+      const res = await fetch('/.netlify/functions/paypal-config');
+      if (!res.ok) throw new Error('Config fetch failed: ' + res.status);
+      const { clientId, plans } = await res.json();
+
+      const script = document.createElement('script');
+      script.src = 'https://www.paypal.com/sdk/js?client-id=' + clientId +
+                   '&vault=true&intent=subscription&currency=ILS';
+      script.setAttribute('data-sdk-integration-source', 'button-factory');
+
+      script.onload = () => {
+        loading.textContent = '';
+        renderPayPalButton('paypal-personal', plans.personal, 'personal');
+        renderPayPalButton('paypal-pro',      plans.pro,      'pro');
+      };
+      script.onerror = () => {
+        loading.textContent = '';
+        errEl.textContent = 'Could not load PayPal. Please refresh or try a different browser.';
+      };
+      document.body.appendChild(script);
+
+    } catch (err) {
+      loading.textContent = '';
+      errEl.textContent = 'Payment options unavailable right now. Please try again shortly.';
+      console.error('Pricing init error:', err);
+    }
+  })();
+
+  function renderPayPalButton(containerId, planId, tier) {
+    if (!window.paypal) return;
+    paypal.Buttons({
+      style: {
+        shape:  'rect',
+        color:  tier === 'pro' ? 'gold' : 'blue',
+        layout: 'vertical',
+        label:  'subscribe'
+      },
+      createSubscription: (data, actions) =>
+        actions.subscription.create({ plan_id: planId }),
+
+      onApprove: async (data) => {
+        const userId = window.symbioUserId || 'erez';
+        const btn = document.querySelector('#' + containerId + ' .paypal-buttons');
+        if (btn) btn.style.opacity = '0.5';
+        try {
+          const res = await fetch('/.netlify/functions/paypal-verify', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ subscriptionId: data.subscriptionID, userId })
+          });
+          const result = await res.json();
+          if (result.success) {
+            const tierLabel = result.tier.charAt(0).toUpperCase() + result.tier.slice(1);
+            document.querySelector('.pricing-wrap').innerHTML =
+              '<div style="text-align:center;padding:80px 20px">' +
+                '<div style="font-size:3rem;margin-bottom:20px">✓</div>' +
+                '<h2 style="font-size:1.8rem;color:#7B6FFF;margin-bottom:12px">Welcome to Symbio ' + tierLabel + '</h2>' +
+                '<p style="color:rgba(255,255,255,.5);margin-bottom:32px">Your account is now active. Returning to app...</p>' +
+                '<a href="index.html" style="display:inline-block;padding:12px 28px;background:#7B6FFF;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Symbio →</a>' +
+              '</div>';
+            setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+          } else {
+            alert('Subscription verification failed. Please contact support.');
+          }
+        } catch (err) {
+          console.error('Verify error:', err);
+          alert('Something went wrong verifying your subscription. Please contact support.');
+        }
+      },
+
+      onError: (err) => {
+        console.error('PayPal button error:', err);
+        errEl.textContent = 'Payment error. Please refresh and try again.';
+      }
+    }).render('#' + containerId);
+  }
+
+  function startFree() {
+    window.location.href = 'index.html';
+  }
+  </script>
+</body>
+</html>
