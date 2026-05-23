@@ -975,4 +975,93 @@ setTimeout(function(){
 },2500);
 
 </script>
+
+
+<!-- PRICING SECTION -->
+<style>
+.pricing-section{padding:60px 20px;text-align:center;background:#0a0a0a;font-family:inherit}
+.pricing-section h2{font-size:2rem;color:#fff;margin-bottom:8px}
+.pricing-section .subtitle{color:#888;margin-bottom:48px;font-size:1rem}
+.pricing-grid{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;max-width:960px;margin:0 auto}
+.plan-card{background:#111;border:1px solid #222;border-radius:16px;padding:36px 28px;width:280px;position:relative;transition:transform 0.2s,border-color 0.2s}
+.plan-card:hover{transform:translateY(-4px);border-color:#444}
+.plan-card.popular{border-color:#6c47ff;box-shadow:0 0 32px rgba(108,71,255,0.15)}
+.plan-card .badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#6c47ff;color:#fff;font-size:0.7rem;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:0.05em;text-transform:uppercase}
+.plan-name{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:4px}
+.plan-tagline{font-size:0.8rem;color:#6c47ff;margin-bottom:20px;font-style:italic}
+.plan-price{font-size:2.4rem;font-weight:800;color:#fff;margin-bottom:4px}
+.plan-price span{font-size:1rem;font-weight:400;color:#666}
+.plan-desc{font-size:0.82rem;color:#888;margin:16px 0 24px;line-height:1.6;min-height:60px}
+.plan-features{list-style:none;padding:0;margin:0 0 28px;text-align:left}
+.plan-features li{font-size:0.82rem;color:#aaa;padding:5px 0;border-bottom:1px solid #1a1a1a}
+.plan-features li::before{content:'✓ ';color:#6c47ff;font-weight:700}
+.paypal-btn-wrap{min-height:50px}
+.plan-free-btn{width:100%;padding:13px;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:8px;font-size:0.9rem;cursor:pointer;transition:background 0.2s}
+.plan-free-btn:hover{background:#222}
+#pricing-loading{color:#666;font-size:0.85rem;margin-top:24px}
+</style>
+
+<section class="pricing-section" id="pricing">
+<h2>Choose Your Symbio</h2>
+<p class="subtitle">Your second brain. Start free. Upgrade when you feel it.</p>
+<div class="pricing-grid">
+<div class="plan-card" id="card-starter">
+<div class="plan-name">Symbio Starter</div>
+<div class="plan-price">Free<span></span></div>
+<div class="plan-desc">Try it. No card. No commitment.</div>
+<ul class="plan-features"><li>30-day memory</li><li>1 project</li><li>Basic tasks</li></ul>
+<div class="paypal-btn-wrap"><button class="plan-free-btn" onclick="startFree()">Get Started Free →</button></div>
+</div>
+<div class="plan-card popular" id="card-personal">
+<div class="badge">Most Popular</div>
+<div class="plan-name">Symbio Personal</div>
+<div class="plan-price">₪18<span>/month</span></div>
+<div class="plan-desc">Full memory. All your projects. Calendar + WhatsApp.</div>
+<ul class="plan-features"><li>Unlimited memory</li><li>5 projects</li><li>Calendar sync</li><li>WhatsApp integration</li></ul>
+<div class="paypal-btn-wrap" id="paypal-personal"></div>
+</div>
+<div class="plan-card" id="card-pro">
+<div class="plan-name">Symbio Pro</div>
+<div class="plan-price">₪29<span>/month</span></div>
+<div class="plan-desc">Business intelligence. CRM. Financial tracking.</div>
+<ul class="plan-features"><li>Everything in Personal</li><li>Multi-user access</li><li>CRM + lead scoring</li><li>Financial tracking</li><li>API access</li></ul>
+<div class="paypal-btn-wrap" id="paypal-pro"></div>
+</div>
+</div>
+<p id="pricing-loading"></p>
+</section>
+
+<script>
+(async function initPricing(){
+  const loading=document.getElementById('pricing-loading');
+  loading.textContent='Loading payment options...';
+  try{
+    const res=await fetch('/.netlify/functions/paypal-config');
+    const {clientId,plans}=await res.json();
+    const script=document.createElement('script');
+    script.src='https://www.paypal.com/sdk/js?client-id='+clientId+'&vault=true&intent=subscription&currency=ILS';
+    script.setAttribute('data-sdk-integration-source','button-factory');
+    script.onload=()=>{loading.textContent='';renderPayPalButton('paypal-personal',plans.personal,'personal');renderPayPalButton('paypal-pro',plans.pro,'pro');};
+    script.onerror=()=>{loading.textContent='Payment unavailable. Please try again later.';};
+    document.body.appendChild(script);
+  }catch(err){loading.textContent='Could not load payment options.';console.error(err);}
+})();
+function renderPayPalButton(containerId,planId,tier){
+  paypal.Buttons({
+    style:{shape:'rect',color:tier==='pro'?'gold':'blue',layout:'vertical',label:'subscribe'},
+    createSubscription:(data,actions)=>actions.subscription.create({plan_id:planId}),
+    onApprove:async(data)=>{
+      const userId=window.symbioUserId||'erez';
+      try{
+        const res=await fetch('/.netlify/functions/paypal-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriptionId:data.subscriptionID,userId})});
+        const result=await res.json();
+        if(result.success){document.getElementById('pricing').innerHTML='<div style="text-align:center;padding:60px;color:#fff"><h2 style="color:#6c47ff">✓ Welcome to Symbio '+result.tier.charAt(0).toUpperCase()+result.tier.slice(1)+'</h2><p style="color:#888">Your account is now active.</p></div>';setTimeout(()=>location.reload(),2000);}
+        else{alert('Subscription verification failed.');}
+      }catch(err){console.error(err);alert('Something went wrong.');}
+    },
+    onError:(err)=>console.error('PayPal error:',err)
+  }).render('#'+containerId);
+}
+function startFree(){const app=document.getElementById('app')||document.getElementById('main');if(app)app.scrollIntoView({behavior:'smooth'});else alert('Welcome to Symbio Starter!');}
+</script>
 </body></html>
