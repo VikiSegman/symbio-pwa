@@ -74,9 +74,28 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 #tierBadge{display:inline-flex;align-items:center;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;line-height:1;text-decoration:none;flex-shrink:0}
 #tierBadge.tier-pro{background:rgba(240,165,0,.15);color:#f0a500;border:1px solid rgba(240,165,0,.35)}
 #tierBadge.tier-personal{background:rgba(30,120,255,.15);color:#5599ff;border:1px solid rgba(30,120,255,.35)}
+body.light{background:#f0f0f8;color:#1a1a2e;}
+body.light #left{background:#e8e8f5;}
+body.light #right{background:#f5f5fc;}
+body.light #hdr{background:rgba(240,240,248,.95);border-color:rgba(0,0,0,.1);}
+body.light #mets{background:rgba(220,220,240,.6);}
+body.light .mv{color:#1a1a2e;}
+body.light .mv.g{color:#0a7a4a;}
+body.light .mv.o{color:#c05000;}
+body.light #sbar{color:#3a3a5a;background:rgba(0,0,0,.05);}
+body.light .tb{color:rgba(0,0,0,.5);}
+body.light .tb.act{color:#6c47ff;border-color:#6c47ff;}
+body.light #chatBox{background:#e8e8f5;}
+body.light .msg-ai{background:#d8d8f0;color:#1a1a2e;}
+body.light .msg-user{background:#6c47ff;color:#fff;}
+body.light #chatInput{background:rgba(255,255,255,.8);color:#1a1a2e;border-color:rgba(0,0,0,.15);}
+body.light #logo{color:#6c47ff;}
+body.light #clk{color:rgba(0,0,0,.6);}
 
-#logoutBtn{background:none;border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.4);cursor:pointer;padding:2px 8px;font-size:10px;}
-#logoutBtn:hover{color:#FF6060;border-color:#FF6060;}
+#logoutBtn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.35);border-radius:6px;color:rgba(255,255,255,.88);cursor:pointer;padding:4px 13px;font-size:11px;font-weight:600;letter-spacing:.02em;}
+#logoutBtn:hover{color:#FF6060;border-color:#FF6060;background:rgba(255,60,60,.12);}
+body.light #logoutBtn{color:rgba(0,0,0,.75);border-color:rgba(0,0,0,.25);background:rgba(0,0,0,.05);}
+body.light #logoutBtn:hover{color:#c00;border-color:#c00;}
 </style>
 </head>
 <body>
@@ -85,21 +104,21 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
   <canvas id="cc"></canvas>
   <div id="hdr">
     <div id="hdrL">
-      <span id="sunBtn">☀️</span>
+      <span id="sunBtn" onclick="swLight()" title="Toggle brightness" style="cursor:pointer;user-select:none">☀️</span>
       <span id="clk">--:--</span>
       <a id="upgBtn" href="pricing.html">Upgrade ⚡</a>
     </div>
     <div id="hdrR">
       <span id="userNameDisplay" style="font-size:0.75rem;color:#888;margin-right:8px;"></span>
       <span id="logo">SYMBIO</span>
-      <button id="logoutBtn" onclick="doLogout()" title="Logout / Switch account">&#x23CF;</button>
+      <button id="logoutBtn" onclick="doLogout()" title="Logout">יציאה</button>
       <div id="sdot"></div>
     </div>
   </div>
   <div id="sbar">DORMANT</div>
   <div id="mets">
     <div class="met"><div class="mv" id="mv1">07:00</div><div class="ml">יומי</div></div>
-    <div class="met"><div class="mv g" id="mv2">2.0M</div><div class="ml">pipeline</div></div>
+    <div class="met"><div class="mv g" id="mv2">—</div><div class="ml">pipeline</div></div>
     <div class="met"><div class="mv o" id="mv3">3</div><div class="ml">רותחים</div></div>
     <div class="met"><div class="mv" id="mv4">3</div><div class="ml">לידים</div></div>
   </div>
@@ -164,6 +183,21 @@ if (_nameDisplay && _firstName) { _nameDisplay.textContent = _firstName; }
 function tick(){var n=new Date();document.getElementById('clk').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
 
 tick();setInterval(tick,1000);
+
+// Light/dark theme toggle
+function swLight(){
+  var b=document.body;
+  b.classList.toggle('light');
+  var s=document.getElementById('sunBtn');
+  if(s) s.textContent=b.classList.contains('light')?'🌙':'☀️';
+  try{localStorage.setItem('symbio_theme',b.classList.contains('light')?'light':'dark');}catch(e){}
+}
+// Restore saved theme on load
+(function(){
+  var t=localStorage.getItem('symbio_theme');
+  if(t==='light'){document.body.classList.add('light');var s=document.getElementById('sunBtn');if(s)s.textContent='🌙';}
+})();
+
 
 // Tier badge: read symbio_tier from localStorage and update header
 (function applyTierBadge(){
@@ -1142,6 +1176,14 @@ async function checkOwner(){
 function applyOwnerUI(isOwner){
   window._isOwner=isOwner;
   window._symbioUID=getOrCreateUID();
+  if(isOwner){
+    // Owner is always PRO — ensure tier badge reflects this
+    if(localStorage.getItem('symbio_tier')!=='pro'){
+      localStorage.setItem('symbio_tier','pro');
+    }
+    var _b=document.getElementById('upgBtn')||document.getElementById('tierBadge');
+    if(_b){_b.id='tierBadge';_b.className='tier-pro';_b.removeAttribute('href');_b.textContent='⚡ Pro';_b.onclick=null;}
+  }
   if(!isOwner){
     var prTab=document.querySelector('[data-tab="pr"]');if(prTab)prTab.style.display='none';
     var tabPr=document.getElementById('tabPr');if(tabPr)tabPr.style.display='none';
@@ -1158,12 +1200,14 @@ function applyOwnerUI(isOwner){
 setTimeout(checkOwner,0);
 // === LOGOUT ===
 function doLogout(){
-  localStorage.removeItem('symbio_uid');
-  Object.keys(localStorage).forEach(function(k){
-    if(k.startsWith('sb-')||k.indexOf('supabase')>=0) localStorage.removeItem(k);
+  // Clear ALL session data — symbio_ keys + Supabase
+  var lkeys=Object.keys(localStorage);
+  lkeys.forEach(function(k){
+    if(k.startsWith('symbio_')||k.startsWith('sb-')||k.indexOf('supabase')>=0) localStorage.removeItem(k);
   });
-  Object.keys(sessionStorage||{}).forEach(function(k){
-    if(k.startsWith('sb-')||k.indexOf('supabase')>=0) sessionStorage.removeItem(k);
+  var skeys=Object.keys(sessionStorage||{});
+  skeys.forEach(function(k){
+    if(k.startsWith('symbio_')||k.startsWith('sb-')||k.indexOf('supabase')>=0) sessionStorage.removeItem(k);
   });
   window.location.href='/login.html';
 }
