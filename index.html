@@ -74,6 +74,9 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 #tierBadge{display:inline-flex;align-items:center;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;line-height:1;text-decoration:none;flex-shrink:0}
 #tierBadge.tier-pro{background:rgba(240,165,0,.15);color:#f0a500;border:1px solid rgba(240,165,0,.35)}
 #tierBadge.tier-personal{background:rgba(30,120,255,.15);color:#5599ff;border:1px solid rgba(30,120,255,.35)}
+
+#logoutBtn{background:none;border:1px solid rgba(255,255,255,.12);border-radius:6px;color:rgba(255,255,255,.4);cursor:pointer;padding:2px 8px;font-size:10px;}
+#logoutBtn:hover{color:#FF6060;border-color:#FF6060;}
 </style>
 </head>
 <body>
@@ -89,6 +92,7 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
     <div id="hdrR">
       <span id="userNameDisplay" style="font-size:0.75rem;color:#888;margin-right:8px;"></span>
       <span id="logo">SYMBIO</span>
+      <button id="logoutBtn" onclick="doLogout()" title="Logout / Switch account">&#x23CF;</button>
       <div id="sdot"></div>
     </div>
   </div>
@@ -955,7 +959,9 @@ async function loadTab(key,url,renderer){
   if(!div)return;
   div.innerHTML='<div class="ld-load">טוען מ-Notion... 🔄</div>';
   try{
-    var res=await fetch(url);
+    var uid=window._symbioUID||localStorage.getItem('symbio_uid')||'';
+    var sep=url.includes('?')?'&':'?';
+    var res=await fetch(url+(uid?sep+'uid='+uid:''));
     var data=await res.json();
     tabLoaded[key]=true;
     renderer(div,data);
@@ -1150,5 +1156,17 @@ function applyOwnerUI(isOwner){
   }
 }
 setTimeout(checkOwner,0);
+// === LOGOUT ===
+function doLogout(){
+  localStorage.removeItem('symbio_uid');
+  Object.keys(localStorage).forEach(function(k){
+    if(k.startsWith('sb-')||k.indexOf('supabase')>=0) localStorage.removeItem(k);
+  });
+  Object.keys(sessionStorage||{}).forEach(function(k){
+    if(k.startsWith('sb-')||k.indexOf('supabase')>=0) sessionStorage.removeItem(k);
+  });
+  window.location.href='/login.html';
+}
+
 </script>
 </body></html>
