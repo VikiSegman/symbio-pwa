@@ -87,6 +87,7 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
       <a id="upgBtn" href="pricing.html">Upgrade ⚡</a>
     </div>
     <div id="hdrR">
+      <span id="userNameDisplay" style="font-size:0.75rem;color:#888;margin-right:8px;"></span>
       <span id="logo">SYMBIO</span>
       <div id="sdot"></div>
     </div>
@@ -150,6 +151,10 @@ if (_upgradeBtn) {
   if (_tier === 'pro') { _upgradeBtn.textContent = '⚡ Pro'; _upgradeBtn.style.background='#f0a500'; _upgradeBtn.style.cursor='default'; _upgradeBtn.onclick=null; }
   else if (_tier === 'personal') { _upgradeBtn.textContent = '● Personal'; _upgradeBtn.style.background='#4A90E2'; }
 }
+// Show user name in header
+const _firstName = localStorage.getItem('symbio_first_name');
+const _nameDisplay = document.getElementById('userNameDisplay');
+if (_nameDisplay && _firstName) { _nameDisplay.textContent = _firstName; }
 
 // Clock
 function tick(){var n=new Date();document.getElementById('clk').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
@@ -771,7 +776,7 @@ async function dispatchVoice(msg, withContext) {
     var res = await fetch('/.netlify/functions/ask', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: fullMsg})
+      body: JSON.stringify({message: fullMsg, userFirstName: localStorage.getItem('symbio_first_name') || ''})
     });
     var data = await res.json();
     var reply = data.reply || data.error || 'אין תגובה';
