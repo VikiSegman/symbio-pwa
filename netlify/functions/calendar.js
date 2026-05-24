@@ -1,4 +1,11 @@
-exports.handler = async () => {
+exports.handler = async (event) => {
+  const ownerUID = (process.env.OWNER_UID || '').trim();
+  const uid = (event.queryStringParameters || {}).uid || '';
+  if (!ownerUID || uid !== ownerUID) {
+    return { statusCode: 200,
+      headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
+      body: JSON.stringify({ events: [] }) };
+  }
   try {
     const url = process.env.GCAL_ICAL_URL;
     if (!url) return { statusCode:200, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}, body: JSON.stringify({error:'GCAL_ICAL_URL not set', events:[]}) };
