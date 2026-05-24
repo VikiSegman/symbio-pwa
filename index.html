@@ -201,6 +201,56 @@ function swLight(){
   if(t==='light'){document.body.classList.add('light');var s=document.getElementById('sunBtn');if(s)s.textContent='🌙';}
 })();
 
+// ── Session Save Manager ──────────────────────────────────────────────────────
+var _sessionMsgs  = [];   // rolling conversation history
+var _sessionTurns = 0;    // turn counter
+var _pauseTimer   = null; // 3-min inactivity timer
+var _saving       = false;
+
+function _trackMsg(role, content) {
+  _sessionMsgs.push({ role, content: content.slice(0, 500) });
+  if (_sessionMsgs.length > 40) _sessionMsgs = _sessionMsgs.slice(-40); // keep last 40
+}
+
+function _resetPauseTimer() {
+  clearTimeout(_pauseTimer);
+  _pauseTimer = setTimeout(function() { _autoSave('pause'); }, 3 * 60 * 1000); // 3 minutes
+}
+
+async function _autoSave(trigger) {
+  if (_saving || _sessionMsgs.length < 2) return;
+  var uid = window._symbioUID || localStorage.getItem('symbio_uid') || '';
+  if (!uid) return;
+  _saving = true;
+  try {
+    var r = await fetch('/.netlify/functions/session-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: _sessionMsgs, uid, trigger })
+    });
+    if (r.ok) {
+      var d = await r.json();
+      if (d.saved) {
+        // Brief visual indicator
+        var ind = document.createElement('div');
+        ind.style.cssText = 'position:fixed;bottom:16px;right:16px;background:rgba(108,71,255,.85);color:#fff;padding:6px 14px;border-radius:8px;font-size:11px;z-index:9999;opacity:1;transition:opacity 1.5s';
+        ind.textContent = '💾 ' + (trigger === 'logout' ? 'Saved before logout' : trigger === 'pause' ? 'Auto-saved' : 'Progress saved');
+        document.body.appendChild(ind);
+        setTimeout(function() { ind.style.opacity = '0'; setTimeout(function() { ind.remove(); }, 1500); }, 2000);
+      }
+    }
+  } catch(e) { /* silent */ }
+  _saving = false;
+}
+
+// Intercept the existing doLogout — save first, then proceed
+var _origLogout = doLogout;
+doLogout = async function() {
+  await _autoSave('logout');
+  _origLogout();
+};
+
+
 
 // Tier badge: read symbio_tier from localStorage and update header
 (function applyTierBadge(){
@@ -823,11 +873,13 @@ async function dispatchVoice(msg, withContext) {
     var res = await fetch('/.netlify/functions/ask', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: fullMsg, uid: window._symbioUID||'', userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''})
+      body: JSON.stringify({message: fullMsg, uid: window._symbioUID||'', userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''});
+      _trackMsg('user', fullMsg); _resetPauseTimer();
     });
     var data = await res.json();
     var reply = data.reply || data.error || 'אין תגובה';
     addMsg(reply, 'a');
+    _trackMsg('assistant', reply); _sessionTurns++; if(_sessionTurns % 10 === 0) _autoSave('turns');
     showVtxt('', '');
     speakText(reply);
     resetConvTimer();
