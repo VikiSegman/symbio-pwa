@@ -74,23 +74,26 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 #tierBadge{display:inline-flex;align-items:center;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;line-height:1;text-decoration:none;flex-shrink:0}
 #tierBadge.tier-pro{background:rgba(240,165,0,.15);color:#f0a500;border:1px solid rgba(240,165,0,.35)}
 #tierBadge.tier-personal{background:rgba(30,120,255,.15);color:#5599ff;border:1px solid rgba(30,120,255,.35)}
-body.light{background:#f0f0f8;color:#1a1a2e;}
-body.light #left{background:#e8e8f5;}
-body.light #right{background:#f5f5fc;}
-body.light #hdr{background:rgba(240,240,248,.95);border-color:rgba(0,0,0,.1);}
-body.light #mets{background:rgba(220,220,240,.6);}
+body.light{background:#d8d8e8;color:#1a1a2e;}
+body.light #left{background:#cdd0e3;}
+body.light #right{background:#d8d8ec;}
+body.light #hdr{background:rgba(210,212,232,.97);border-color:rgba(0,0,0,.15);}
+body.light #mets{background:rgba(195,198,222,.75);}
 body.light .mv{color:#1a1a2e;}
 body.light .mv.g{color:#0a7a4a;}
 body.light .mv.o{color:#c05000;}
-body.light #sbar{color:#3a3a5a;background:rgba(0,0,0,.05);}
-body.light .tb{color:rgba(0,0,0,.5);}
+body.light #sbar{color:#2a2a4a;background:rgba(0,0,0,.08);}
+body.light .tb{color:rgba(0,0,0,.55);}
 body.light .tb.act{color:#6c47ff;border-color:#6c47ff;}
-body.light #chatBox{background:#e8e8f5;}
-body.light .msg-ai{background:#d8d8f0;color:#1a1a2e;}
+body.light #chatBox{background:#cdd0e3;}
+body.light .msg-ai{background:#bcbfda;color:#1a1a2e;}
 body.light .msg-user{background:#6c47ff;color:#fff;}
-body.light #chatInput{background:rgba(255,255,255,.8);color:#1a1a2e;border-color:rgba(0,0,0,.15);}
+body.light #chatInput{background:#ffffff;color:#1a1a2e;border:1.5px solid rgba(80,80,160,.4);}
+body.light #chatInput::placeholder{color:rgba(0,0,0,.4);}
 body.light #logo{color:#6c47ff;}
-body.light #clk{color:rgba(0,0,0,.6);}
+body.light #clk{color:rgba(0,0,0,.65);}
+body.light .ld-err{color:rgba(180,60,60,.85);}
+body.light .ld-load{color:rgba(0,0,0,.4);}
 
 #logoutBtn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.35);border-radius:6px;color:rgba(255,255,255,.88);cursor:pointer;padding:4px 13px;font-size:11px;font-weight:600;letter-spacing:.02em;}
 #logoutBtn:hover{color:#FF6060;border-color:#FF6060;background:rgba(255,60,60,.12);}
@@ -217,7 +220,13 @@ function swLight(){
     btn.textContent = '● Personal';
     btn.onclick = null;
   }
-  // starter or null → keep upgBtn as-is
+  } else {
+    // starter / null → show plan name but styled differently
+    if(tier && tier !== 'starter'){
+      btn.id='tierBadge';btn.className='tier-'+tier;btn.removeAttribute('href');
+      btn.textContent='● '+tier.charAt(0).toUpperCase()+tier.slice(1);btn.onclick=null;
+    }
+  }
 })();
 
 // Dot pulse
@@ -1051,12 +1060,13 @@ function renderPipeline(div,data){
 // Auto-load pipeline on start (silent — updates metrics only)
 setTimeout(function(){
   try{
-    fetch('/.netlify/functions/pipeline')
+    var _puid=window._symbioUID||localStorage.getItem('symbio_uid')||'';
+    fetch('/.netlify/functions/pipeline'+(_puid?'?uid='+_puid:''))
       .then(function(r){return r.json();})
       .then(function(data){var d=document.createElement('div');renderPipeline(d,data);})
       .catch(function(){});
   }catch(e){}
-},2500);
+},3000);
 
 </script>
 
