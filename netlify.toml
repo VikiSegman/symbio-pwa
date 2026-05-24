@@ -11,4 +11,14 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
 
-# deploy-trigger: isOwner patch
+# Service worker must never be cached by CDN
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# HTML always fresh
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
