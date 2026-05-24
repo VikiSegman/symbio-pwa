@@ -1,6 +1,29 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
+<script>
+// Cache buster v5 — runs before anything else
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  // Clear all caches immediately
+  if(window.caches) {
+    caches.keys().then(function(keys){
+      keys.forEach(function(key){ caches.delete(key); });
+    });
+  }
+  // Unregister old service workers, re-register fresh
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    var hadOld = regs.some(function(r){ return r.active && r.active.scriptURL.includes('sw.js'); });
+    regs.forEach(function(r){ r.unregister(); });
+    if(hadOld) {
+      // Re-register after clearing
+      setTimeout(function(){
+        navigator.serviceWorker.register('/sw.js');
+      }, 100);
+    }
+  });
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
