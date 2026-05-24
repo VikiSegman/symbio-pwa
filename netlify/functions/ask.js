@@ -123,7 +123,7 @@ async function getFinancialContext() {
 exports.handler = async (event) => {
   if (event.httpMethod!=='POST') return {statusCode:405,body:'Not Allowed'};
   try {
-    const {message,project} = JSON.parse(event.body||'{}');
+    const {message,project,userId,userFirstName} = JSON.parse(event.body||'{}');
     if (!message) return {statusCode:400,body:JSON.stringify({error:'No message'})};
 
     const isFinancial = /ריבית|שריפה|חוב|תזרים|כסף|עלות|מש"|₪|interest|burn|financial/i.test(message);
@@ -158,7 +158,10 @@ exports.handler = async (event) => {
         financialData.projects.map(p=>`• ${p.name}: קרן ₪${p.principal?.toLocaleString()} | ${p.rate}% | נצבר ₪${p.interest_accrued?.toLocaleString()} | ₪${p.monthly_burn?.toLocaleString()}/חודש`).join('\n')+'\n';
     }
 
-    const system = `אתה סימביו — מערכת ה-AI האישית של ארז סגמן (Erez Segman). ישיר, חד, דו-לשוני עברית/אנגלית. יועץ בכיר מהימן. פרויקט פעיל: ${project||'כללי'}. מטרות: 100K ש"ח/חודש — Financia (בת ים תמא 38/2, הרצליה), Lotar (הדרכות, אפריקה, חוות), ייעוץ משכנתאות (2% מינ˳ 12,500 ש"ח), AAF (תרומות), Tax Liens ארה"ב. כללי תגובה: 1-3 משפטים. רשימות: 3 מילות, מקסימום 5. אל תחזור. אותה שפה כמו המשתמש.${memoryContext}${peopleContext}${financialContext}`;
+    const isErez = !userId || userId === 'erez' || userId.startsWith('erez_');
+    const system = isErez
+      ? `אתה סימביו — מערכת ה-AI האישית של ארז סגמן (Erez Segman). ישיר, חד, דו-לשוני עברית/אנגלית. יועץ בכיר מהימן. פרויקט פעיל: ${project||'כללי'}. מטרות: 100K ש"ח/חודש — Financia (בת ים תמא 38/2, הרצליה), Lotar (הדרכות, אפריקה, חוות), ייעוץ משכנתאות (2% מינ˳ 12,500 ש"ח), AAF (תרומות), Tax Liens ארה"ב. כללי תגובה: 1-3 משפטים. רשימות: 3 מילות, מקסימום 5. אל תחזור. אותה שפה כמו המשתמש.${memoryContext}${peopleContext}${financialContext}`
+      : `אתה סימביו — מערכת ה-AI האישית של ${userFirstName || userId || 'המשתמש'}. ישיר, חד, דו-לשוני עברית/אנגלית. יועץ אישי מהימן. פרויקט פעיל: ${project||'כללי'}. כללי תגובה: 1-3 משפטים. רשימות: עד 5 פריטים. אל תחזור. אותה שפה כמו המשתמש.${memoryContext}`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
