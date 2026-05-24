@@ -73,6 +73,18 @@ localStorage.setItem('symbio_user_id', profile.user_id);
 localStorage.setItem('symbio_first_name', profile.first_name || '');
 localStorage.setItem('symbio_tier', profile.tier || 'starter');
 localStorage.setItem('symbio_session', JSON.stringify({ access_token: accessToken, refresh_token: refreshToken }));
+// Check if this is the owner account and set symbio_uid
+try {
+  const ownerCheck = await fetch('/.netlify/functions/init', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ supabaseToken: accessToken })
+  });
+  const ownerData = await ownerCheck.json();
+  if (ownerData.isOwner && ownerData.ownerUID) {
+    localStorage.setItem('symbio_uid', ownerData.ownerUID);
+  }
+} catch(e) {}
 document.getElementById('msg').textContent = `Welcome, ${profile.first_name || 'back'}! Loading...`;
 setTimeout(() => window.location.href = '/', 800);
 } catch (err) {
