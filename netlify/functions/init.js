@@ -4,7 +4,7 @@ exports.handler = async (event) => {
   }
   try {
     const { uid } = JSON.parse(event.body || '{}');
-    const ownerUID = (process.env.OWNER_UUID || '').trim();
+    const ownerUID = (process.env.OWNER_UID || '').trim();
     const isOwner = ownerUID.length > 0 && uid === ownerUID;
     return {
       statusCode: 200,
