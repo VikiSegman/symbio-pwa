@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#080612">
-  <title>Symbio ÃÂ¢ÃÂÃÂ Pricing</title>
+  <title>Symbio — Pricing</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{min-height:100%;background:#08091A;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:#E8E8F0}
 
-    /* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ TOP NAV ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+    /* TOP NAV */
     .top-nav{
       display:flex;align-items:center;justify-content:space-between;
       padding:14px 24px;
@@ -33,7 +33,7 @@
     .nav-logo{font-size:13px;font-weight:700;letter-spacing:.18em;color:#E8E8F0}
     .nav-spacer{width:100px}
 
-    /* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ HERO ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+    /* HERO */
     .hero{
       text-align:center;
       padding:64px 20px 40px;
@@ -50,7 +50,7 @@
       line-height:1.6;
     }
 
-    /* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ PRICING GRID ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+    /* PRICING GRID */
     .pricing-wrap{
       padding:0 20px 80px;
       max-width:1020px;margin:0 auto;
@@ -134,7 +134,7 @@
     #pricing-loading{color:rgba(255,255,255,.3);font-size:0.83rem;text-align:center;margin-top:28px;min-height:24px}
     #pricing-err{color:#FF6B6B;font-size:0.8rem;text-align:center;margin-top:12px}
 
-    /* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ FOOTER ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+    /* FOOTER */
     .pricing-footer{
       text-align:center;padding:28px 20px 48px;
       color:rgba(255,255,255,.22);font-size:0.78rem;line-height:1.8;
@@ -142,7 +142,7 @@
     .pricing-footer a{color:rgba(123,111,255,.7);text-decoration:none}
     .pricing-footer a:hover{color:#7B6FFF}
 
-    /* ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ RESPONSIVE ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ */
+    /* RESPONSIVE */
     @media(max-width:680px){
       .hero h1{font-size:2rem}
       .plan-card{width:100%;max-width:360px}
@@ -163,8 +163,28 @@
       Back to Symbio
     </a>
     <span class="nav-logo">SYMBIO</span>
-    <div class="nav-spacer"></div>
+    <div id="navUserInfo" style="display:flex;align-items:center;gap:10px;font-size:12px;">
+      <span id="navUserName" style="color:rgba(255,255,255,.6);"></span>
+      <span id="navUserPlan" style="padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px;"></span>
+    </div>
   </nav>
+  <script>
+  (function(){
+    var name = localStorage.getItem('symbio_first_name') || '';
+    var tier = localStorage.getItem('symbio_tier') || 'starter';
+    var nameEl = document.getElementById('navUserName');
+    var planEl = document.getElementById('navUserPlan');
+    if(nameEl && name) nameEl.textContent = name;
+    if(planEl){
+      var colors = {pro:'background:rgba(240,165,0,.2);color:#f0a500;border:1px solid rgba(240,165,0,.35)',
+                    personal:'background:rgba(74,144,226,.2);color:#5599ff;border:1px solid rgba(74,144,226,.35)',
+                    starter:'background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.15)'};
+      var labels = {pro:'⚡ Pro',personal:'● Personal',starter:'◆ Starter'};
+      planEl.setAttribute('style', (colors[tier]||colors.starter)+';padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px;');
+      planEl.textContent = labels[tier] || '◆ Starter';
+    }
+  })();
+  </script>
 
   <!-- HERO -->
   <div class="hero">
@@ -182,7 +202,7 @@
         <div class="plan-tagline">"Your memory is lying to you."</div>
         <div class="plan-price"><sup>$</sup>0.99<span class="per">/mo</span></div>
 <div class="setup-line">+ $0.99 one-time activation fee</div>
-        <p class="plan-desc">You made a decision last Tuesday. A brilliant idea Wednesday. A promise Thursday. Gone. Symbio remembers everything you forget Ã¢ÂÂ decisions, commitments, goals. Not as notes. As living memory that knows what matters to you.</p>
+        <p class="plan-desc">You made a decision last Tuesday. A brilliant idea Wednesday. A promise Thursday. Gone. Symbio remembers everything you forget — decisions, commitments, goals. Not as notes. As living memory that knows what matters to you.</p>
         <hr class="divider">
         <ul class="plan-features">
           <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>30-day conversation memory</li>
@@ -201,7 +221,7 @@
         <div class="plan-tagline">"You're running your life from your head. That's why things fall through the cracks."</div>
         <div class="plan-price"><sup>$</sup>5<span class="per">/mo</span></div>
 <div class="setup-line">+ $0.99 one-time activation fee</div>
-        <p class="plan-desc">Symbio Personal connects everything. Knows your goals, tracks commitments, remembers every person you mention, syncs your calendar, reaches you on WhatsApp. Doesn't wait to be asked Ã¢ÂÂ tells you what's about to slip.</p>
+        <p class="plan-desc">Symbio Personal connects everything. Knows your goals, tracks commitments, remembers every person you mention, syncs your calendar, reaches you on WhatsApp. Doesn't wait to be asked — tells you what's about to slip.</p>
         <hr class="divider">
         <ul class="plan-features">
           <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Unlimited memory</li>
@@ -220,7 +240,7 @@
         <div class="plan-tagline">"Your competitors work harder. You're about to work smarter."</div>
         <div class="plan-price"><sup>$</sup>8<span class="per">/mo</span></div>
 <div class="setup-line">+ $0.99 one-time activation fee</div>
-        <p class="plan-desc">Tracks your burn rate, scores your leads, flags stale relationships, automates your workflow Ã¢ÂÂ before you notice the problem. It doesn't just remember. It thinks.</p>
+        <p class="plan-desc">Tracks your burn rate, scores your leads, flags stale relationships, automates your workflow — before you notice the problem. It doesn't just remember. It thinks.</p>
         <hr class="divider">
         <ul class="plan-features">
           <li><span class="check"><svg viewBox="0 0 12 12"><polyline points="2 6 5 9 10 3"/></svg></span>Everything in Personal</li>
@@ -243,7 +263,7 @@
   <footer class="pricing-footer">
     <div style="font-size:0.9rem;color:rgba(255,255,255,.5);margin-bottom:10px;font-style:italic">One recovered deal pays for 10 years of Symbio Pro.</div>
     <div>Payments secured by PayPal · Cancel anytime</div>
-    <div style="margin-top:6px">Questions? Ask Symbio directly ÃÂ¢ÃÂÃÂ <a href="index.html">open the app</a></div>
+    <div style="margin-top:6px">Questions? Ask Symbio directly — <a href="index.html">open the app</a></div>
   </footer>
 
   <script>
@@ -308,10 +328,10 @@
             const tierLabel = result.tier.charAt(0).toUpperCase() + result.tier.slice(1);
             document.querySelector('.pricing-wrap').innerHTML =
               '<div style="text-align:center;padding:80px 20px">' +
-                '<div style="font-size:3rem;margin-bottom:20px">ÃÂ¢ÃÂÃÂ</div>' +
+                '<div style="font-size:3rem;margin-bottom:20px">✓</div>' +
                 '<h2 style="font-size:1.8rem;color:#7B6FFF;margin-bottom:12px">Welcome to Symbio ' + tierLabel + '</h2>' +
                 '<p style="color:rgba(255,255,255,.5);margin-bottom:32px">Your account is now active. Returning to app...</p>' +
-                '<a href="index.html" style="display:inline-block;padding:12px 28px;background:#7B6FFF;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Symbio ÃÂ¢ÃÂÃÂ</a>' +
+                '<a href="index.html" style="display:inline-block;padding:12px 28px;background:#7B6FFF;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Symbio →</a>' +
               '</div>';
             setTimeout(() => { window.location.href = 'index.html'; }, 3000);
           } else {
