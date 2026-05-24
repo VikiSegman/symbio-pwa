@@ -776,7 +776,7 @@ async function dispatchVoice(msg, withContext) {
     var res = await fetch('/.netlify/functions/ask', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: fullMsg, userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''})
+      body: JSON.stringify({message: fullMsg, uid: window._symbioUID||'', userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''})
     });
     var data = await res.json();
     var reply = data.reply || data.error || 'אין תגובה';
@@ -917,7 +917,7 @@ async function sendMsg(){
     var res=await fetch('/.netlify/functions/ask',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg})
+      body:JSON.stringify({message:msg,uid:window._symbioUID||''})
     });
     var data=await res.json();
     var reply=data.reply||data.error||'אין תגובה';
@@ -1107,5 +1107,48 @@ function renderPayPalButton(containerId,planId,tier){
   }).render('#'+containerId);
 }
 function startFree(){const app=document.getElementById('app')||document.getElementById('main');if(app)app.scrollIntoView({behavior:'smooth'});else alert('Welcome to Symbio Starter!');}
+// === OWNER IDENTITY (Change C) ===
+function getOrCreateUID(){
+  var uid=localStorage.getItem('symbio_uid');
+  if(!uid){
+    try{uid=crypto.randomUUID();}catch(e){uid='uid-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
+    localStorage.setItem('symbio_uid',uid);
+  }
+  return uid;
+}
+
+// AUTO-ACTIVATION: visit ?activate=<uuid> once to become owner
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  var act=p.get('activate');
+  if(act&&act.length>20){localStorage.setItem('symbio_uid',act);history.replaceState(null,'',window.location.pathname);}
+})();
+
+async function checkOwner(){
+  try{
+    var uid=getOrCreateUID();
+    var res=await fetch('/.netlify/functions/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid})});
+    var d=await res.json();
+    applyOwnerUI(d.isOwner===true);
+  }catch(e){applyOwnerUI(false);}
+}
+
+function applyOwnerUI(isOwner){
+  window._isOwner=isOwner;
+  window._symbioUID=getOrCreateUID();
+  if(!isOwner){
+    var prTab=document.querySelector('[data-tab="pr"]');if(prTab)prTab.style.display='none';
+    var tabPr=document.getElementById('tabPr');if(tabPr)tabPr.style.display='none';
+    ['mv2','mv3','mv4'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='—';el.className='mv';}});
+    var tabs=document.querySelectorAll('.tb');
+    var activePr=document.querySelector('.tb.act[data-tab="pr"]');
+    if(activePr&&tabs.length>0){
+      tabs.forEach(function(t){t.classList.remove('act');});
+      var first=null;tabs.forEach(function(t){if(!first&&t.style.display!=='none')first=t;});
+      if(first){first.classList.add('act');if(typeof swTab==='function')swTab(first);}
+    }
+  }
+}
+setTimeout(checkOwner,0);
 </script>
 </body></html>
