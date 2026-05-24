@@ -99,6 +99,11 @@ body.light .ld-load{color:rgba(0,0,0,.4);}
 #logoutBtn:hover{color:#FF6060;border-color:#FF6060;background:rgba(255,60,60,.12);}
 body.light #logoutBtn{color:rgba(0,0,0,.75);border-color:rgba(0,0,0,.25);background:rgba(0,0,0,.05);}
 body.light #logoutBtn:hover{color:#c00;border-color:#c00;}
+
+#alertBanner{display:none;background:linear-gradient(135deg,#c0392b,#8B0000);color:#fff;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;letter-spacing:.02em;border-bottom:1px solid rgba(255,255,255,.15);}
+#alertBanner:hover{background:linear-gradient(135deg,#e74c3c,#a00);}
+#alertBanner .ab-close{float:right;opacity:.7;margin-left:12px;font-weight:400;}
+body.light #alertBanner{background:linear-gradient(135deg,#e74c3c,#c0392b);}
 </style>
 </head>
 <body>
@@ -119,6 +124,7 @@ body.light #logoutBtn:hover{color:#c00;border-color:#c00;}
     </div>
   </div>
   <div id="sbar">DORMANT</div>
+  <div id="alertBanner" onclick="swTab(document.querySelector('[data-tab=\"p\"]'))"><span id="alertText"></span><span class="ab-close" onclick="event.stopPropagation();this.parentElement.style.display='none'">✕</span></div>
   <div id="mets">
     <div class="met"><div class="mv" id="mv1">07:00</div><div class="ml">יומי</div></div>
     <div class="met"><div class="mv g" id="mv2">—</div><div class="ml">pipeline</div></div>
@@ -1240,6 +1246,7 @@ function applyOwnerUI(isOwner){
   window._symbioUID=getOrCreateUID();
   if(isOwner){
     // Owner is always PRO — ensure tier badge reflects this
+    loadPipelineAlerts();
     if(localStorage.getItem('symbio_tier')!=='pro'){
       localStorage.setItem('symbio_tier','pro');
     }
@@ -1258,6 +1265,43 @@ function applyOwnerUI(isOwner){
       if(first){first.classList.add('act');if(typeof swTab==='function')swTab(first);}
     }
   }
+}
+
+// Pipeline alert loader — runs after owner confirmed
+async function loadPipelineAlerts() {
+  try {
+    var uid = window._symbioUID || localStorage.getItem('symbio_uid') || '';
+    if (!uid) return;
+    var r = await fetch('/.netlify/functions/pipeline-alert?uid=' + uid);
+    if (!r.ok) return;
+    var d = await r.json();
+    if (!d.alerts || !d.alerts.length) return;
+    var overdue = d.alerts.filter(function(a){ return a.type === 'overdue'; });
+    var critical = d.alerts.filter(function(a){ return a.urgency === 'critical'; });
+    if (!overdue.length && !critical.length) return;
+    var banner = document.getElementById('alertBanner');
+    var txt    = document.getElementById('alertText');
+    if (!banner || !txt) return;
+    var msg = '⏰ ' + overdue.length + ' deal' + (overdue.length>1?'s':'') + ' overdue';
+    if (d.summary && d.summary.weightedValue) {
+      msg += ' · ₪' + Math.round(d.summary.weightedValue/1000) + 'K weighted pipeline';
+    }
+    var topDeal = overdue[0];
+    if (topDeal) msg += ' · ' + topDeal.deal + ': ' + topDeal.message;
+    txt.textContent = msg;
+    banner.style.display = 'block';
+    // Also update pipeline metric
+    if (d.summary && d.summary.weightedValue) {
+      var mv2 = document.getElementById('mv2');
+      if (mv2) { var v = d.summary.weightedValue; mv2.textContent = v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?Math.round(v/1e3)+'K':v; }
+    }
+    if (d.summary) {
+      var mv3 = document.getElementById('mv3');
+      if (mv3) mv3.textContent = d.summary.overdueCount || '—';
+      var mv4 = document.getElementById('mv4');
+      if (mv4) mv4.textContent = d.summary.hotDeals || '—';
+    }
+  } catch(e) {}
 }
 setTimeout(checkOwner,0);
 // === LOGOUT ===
