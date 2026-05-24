@@ -1,4 +1,11 @@
-exports.handler = async () => {
+exports.handler = async (event) => {
+  const ownerUID = (process.env.OWNER_UID || '').trim();
+  const uid = (event.queryStringParameters || {}).uid || '';
+  if (!ownerUID || uid !== ownerUID) {
+    return { statusCode: 200,
+      headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
+      body: JSON.stringify({ lines: [] }) };
+  }
   try {
     const token = process.env.NOTION_TOKEN;
     if (!token) return { statusCode:200, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}, body: JSON.stringify({error:'NOTION_TOKEN not set'}) };
