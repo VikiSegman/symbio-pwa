@@ -119,15 +119,39 @@ Always prioritize cash flow, lead generation, and deal closure.${memoryBlock}`;
 
     const reply = data.content[0].text;
 
-    // ── fire-and-forget memory store (owner only) ──
+    // ── parallel: memory store + ambient entity extraction ──
+    let finalReply = reply;
+
     if (isOwner) {
+      // Memory store — fire and forget
       storeMemory(message, reply, userId).catch(() => {});
+
+      // Ambient extraction — wait for result to append confirmation
+      try {
+        const extractRes = await fetch(
+          `${process.env.URL || 'https://snazzy-paprenjak-7e69b9.netlify.app'}/.netlify/functions/extract`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userMessage: message, assistantReply: reply, uid })
+          }
+        );
+        if (extractRes.ok) {
+          const extractData = await extractRes.json();
+          if (extractData.confirmation) {
+            finalReply = reply + extractData.confirmation;
+          }
+        }
+      } catch(e) {
+        // Extraction failure never breaks the response
+        console.error('[ask/extract]', e.message);
+      }
     }
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ reply })
+      body: JSON.stringify({ reply: finalReply })
     };
 
   } catch(e) {
