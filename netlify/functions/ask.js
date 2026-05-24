@@ -8,11 +8,9 @@ exports.handler = async (event) => {
 
     if (!message) return { statusCode: 400, body: JSON.stringify({ error: 'No message' }) };
 
-    // ── IDENTITY: isOwner changes context, not access ──
-    const ownerUID = (process.env.OWNER_UUID || '').trim();
+    const ownerUID = (process.env.OWNER_UID || '').trim();
     const isOwner = ownerUID.length > 0 && uid === ownerUID;
 
-    // ── PLATFORM RULES (universal) ──
     const platformRules = `RESPONSE STYLE (non-negotiable):
 - Default: 1-3 sentences MAX. Never longer unless user asks "explain more" or "expand".
 - If listing items: bullet points, 3 words per bullet, max 5 bullets.
@@ -22,12 +20,11 @@ exports.handler = async (event) => {
 - Language: respond in the SAME language the user used. Mixed He/En input -> mixed He/En output.
 `;
 
-    // ── USER CONTEXT (owner-personalized vs generic) ──
     const userContext = isOwner
-      ? `You are Symbio – personalized AI for Erez Segman.
-Active project: ${project || 'general'}.
-Goals: 100K NIS/month across Financia (RE dev+fund, Bat Yam + Herzliya תמ"א projects), Lotar (CT training+farm club), Mortgage Advisory (2% fee min 12,500 NIS), AAF (NGO), Tax Liens USA (18%+ yield).
-Always prioritize cash flow, lead generation, and deal closure.`
+      ? \`You are Symbio – a personalized AI operating system for Erez Segman.
+Active project: \${project || 'general'}.
+Goals: 100K NIS/month across Financia (RE dev+fund, Bat Yam + Herzliya תמ"א projects), Lotar (CT training+farm club), Mortgage Advisory (2% fee min 12,500 NIS), AAF (NGO donations), Tax Liens USA (18%+ annual yield).
+Always prioritize cash flow, lead generation, and deal closure.\`
       : `You are Symbio – a helpful AI assistant. Answer concisely and helpfully.`;
 
     const system = platformRules + '\n' + userContext;
@@ -48,7 +45,7 @@ Always prioritize cash flow, lead generation, and deal closure.`
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || `API error ${res.status}`);
+    if (!res.ok) throw new Error(data.error?.message || \`API error \${res.status}\`);
 
     return {
       statusCode: 200,
