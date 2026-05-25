@@ -901,9 +901,9 @@ async function dispatchVoice(msg, withContext) {
     var res = await fetch('/.netlify/functions/ask', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: fullMsg, uid: window._symbioUID||'', userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''});
-      _trackMsg('user', fullMsg); _resetPauseTimer();
+      body: JSON.stringify({message: fullMsg, uid: window._symbioUID||'', userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''})
     });
+    _trackMsg('user', fullMsg); _resetPauseTimer();;
     var data = await res.json();
     var reply = data.reply || data.error || 'אין תגובה';
     addMsg(reply, 'a');
