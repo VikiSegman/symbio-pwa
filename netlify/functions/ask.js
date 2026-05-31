@@ -128,14 +128,17 @@ Always prioritize cash flow, lead generation, and deal closure.${memoryBlock}`;
 
       // Ambient extraction — wait for result to append confirmation
       try {
-        const extractRes = await fetch(
+        const extractRes = await Promise.race([
+          fetch(
           `${process.env.URL || 'https://snazzy-paprenjak-7e69b9.netlify.app'}/.netlify/functions/extract`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userMessage: message, assistantReply: reply, uid })
           }
-        );
+        ),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('extract timeout')), 3000))
+        ]);
         if (extractRes.ok) {
           const extractData = await extractRes.json();
           if (extractData.confirmation) {
@@ -157,7 +160,7 @@ Always prioritize cash flow, lead generation, and deal closure.${memoryBlock}`;
   } catch(e) {
     console.error('[ask]', e.message);
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: e.message, reply: 'שגיאה: ' + e.message })
     };
