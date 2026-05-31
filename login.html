@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Symbio — Login</title>
 <style>
@@ -167,10 +170,7 @@ if (document.referrer.includes('pricing')) switchTab('signup');
 async function doGoogle() {
 // Fetch Supabase URL from server config — no keys in source
 const cfg = await fetch('/.netlify/functions/config').then(r => r.json());
-const origin = window.location.hostname === 'localhost' 
-    ? 'https://snazzy-paprenjak-7e69b9.netlify.app'
-    : window.location.origin;
-  const redirectTo = encodeURIComponent(origin + '/auth-callback.html');
+const redirectTo = encodeURIComponent(window.location.origin + '/auth-callback.html');
 window.location.href = `${cfg.supabaseUrl}/auth/v1/authorize?provider=google&prompt=select_account&redirect_to=${redirectTo}`;
 }
 
