@@ -1024,10 +1024,10 @@ setTimeout(function(){ setConvState('dormant'); }, 500);
 // ============ CHAT — sendMsg + addMsg (required by buttons) ============
 function addMsg(text, role){
   var m=document.getElementById('msgs');
-  if(!m)return;
+  if(!m){ console.error('[addMsg] msgs div not found'); return; }
   var d=document.createElement('div');
   d.className='msg '+role;
-  d.textContent=text;
+  d.textContent=text||'(empty)';
   m.appendChild(d);
   m.scrollTop=m.scrollHeight;
 }
@@ -1040,15 +1040,19 @@ async function sendMsg(){
   showVtxt('','');
   addMsg(msg,'u');
   setFaceState('thinking');
+  var uid=window._symbioUID||localStorage.getItem('symbio_uid')||'';
   try{
     var res=await fetch('/.netlify/functions/ask',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,uid:window._symbioUID||''})
+      body:JSON.stringify({message:msg,uid:uid,userFirstName:localStorage.getItem('symbio_first_name')||''})
     });
-    var data=await res.json();
-    var reply=data.reply||data.error||'אין תגובה';
+    var raw=await res.text();
+    var data;
+    try{ data=JSON.parse(raw); }catch(pe){ data={error:'Parse error: '+raw.slice(0,100)}; }
+    var reply=data.reply||data.error||'אין תגובה (status '+res.status+')';
     addMsg(reply,'a');
+    setFaceState('idle');
     speakText(reply);
   }catch(e){
     addMsg('שגיאת חיבור: '+e.message,'a');
