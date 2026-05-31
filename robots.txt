@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /auth-callback.html
+Disallow: /.netlify/
+
+# Symbio — Personal AI Operating System
+# https://symbio.app (coming soon)
+
