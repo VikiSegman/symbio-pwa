@@ -1,24 +1,31 @@
 [build]
-  functions = "netlify/functions"
-  publish = "."
+functions = "netlify/functions"
+publish = "."
 
 [functions]
-  node_bundler = "esbuild"
+node_bundler = "esbuild"
 
+# Global Security Headers — resolves Google Safe Browsing false-positive
 [[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+X-XSS-Protection = "1; mode=block"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Permissions-Policy = "camera=(), microphone=(self), geolocation=(), payment=()"
+Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://accounts.google.com; font-src 'self'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';"
 
+# Service Worker
 [[headers]]
-  for = "/sw.js"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+for = "/sw.js"
+[headers.values]
+Cache-Control = "no-cache, no-store, must-revalidate"
 
+# HTML files always fresh
 [[headers]]
-  for = "/*.html"
-  [headers.values]
-    Cache-Control = "no-cache"
+for = "/*.html"
+[headers.values]
+Cache-Control = "no-cache"
 
-# redeploy-trigger: symbio-app rename fix 31/05/2026
