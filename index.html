@@ -1039,9 +1039,9 @@ async function sendMsg(){
   if(ci)ci.value='';
   showVtxt('','');
   addMsg(msg,'u');
-  setFaceState('thinking');
   var uid=window._symbioUID||localStorage.getItem('symbio_uid')||'';
   try{
+    try{ setFaceState('thinking'); }catch(_){}
     var res=await fetch('/.netlify/functions/ask',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
