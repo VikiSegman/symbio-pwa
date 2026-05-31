@@ -1,0 +1,5 @@
+Contact: mailto:erez.financia@gmail.com
+Preferred-Languages: en, he
+Canonical: https://snazzy-paprenjak-7e69b9.netlify.app/.well-known/security.txt
+Policy: This is a legitimate personal AI assistant application.
+
