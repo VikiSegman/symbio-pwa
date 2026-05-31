@@ -1,7 +1,5 @@
 const https = require('https');
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 function httpsPost(hostname, path, headers, body) {
   return new Promise((resolve, reject) => {
     const buf = JSON.stringify(body);
@@ -16,153 +14,92 @@ function httpsPost(hostname, path, headers, body) {
   });
 }
 
-async function embedText(text) {
-  const r = await httpsPost('api.openai.com', '/v1/embeddings',
-    { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-    { model: 'text-embedding-3-small', input: text.slice(0, 4000) }
-  );
-  if (r.body.error) throw new Error(r.body.error.message);
-  return r.body.data[0].embedding;
-}
-
 async function searchMemories(query, userId) {
   try {
-    const embedding = await embedText(query);
+    const r = await httpsPost('api.openai.com', '/v1/embeddings',
+      { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      { model: 'text-embedding-3-small', input: query.slice(0, 4000) }
+    );
+    if (r.body.error) return [];
+    const embedding = r.body.data[0].embedding;
     const host = new URL(process.env.SUPABASE_URL).hostname;
-    const r = await httpsPost(host, '/rest/v1/rpc/match_memories',
+    const r2 = await httpsPost(host, '/rest/v1/rpc/match_memories',
       { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}` },
       { query_embedding: embedding, match_threshold: 0.72, match_count: 4, filter_user_id: userId }
     );
-    return (Array.isArray(r.body) ? r.body : [])
-      .map(m => `[${m.session_date || 'past'}] ${m.content}`);
-  } catch(e) {
-    console.error('[memory-search]', e.message);
-    return [];
-  }
+    return (Array.isArray(r2.body) ? r2.body : []).map(m => `[${m.session_date || 'past'}] ${m.content}`);
+  } catch(e) { return []; }
 }
 
 async function storeMemory(userMessage, assistantReply, userId) {
   try {
     if (userMessage.length < 5 || assistantReply.length < 10) return;
     const content = `User: ${userMessage}\nSymbio: ${assistantReply}`;
-    const embedding = await embedText(content);
+    const r = await httpsPost('api.openai.com', '/v1/embeddings',
+      { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+      { model: 'text-embedding-3-small', input: content }
+    );
+    if (r.body.error) return;
     const host = new URL(process.env.SUPABASE_URL).hostname;
     await httpsPost(host, '/rest/v1/memories',
       { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
-      { user_id: userId, content, embedding, memory_type: 'conversation', session_date: new Date().toISOString().split('T')[0] }
+      { user_id: userId, content, embedding: r.body.data[0].embedding, memory_type: 'conversation', session_date: new Date().toISOString().split('T')[0] }
     );
-  } catch(e) {
-    console.error('[memory-store]', e.message);
-  }
+  } catch(e) {}
 }
 
-// ── handler ───────────────────────────────────────────────────────────────────
+const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const { message, project, uid } = JSON.parse(event.body || '{}');
-    if (!message) return { statusCode: 400, body: JSON.stringify({ error: 'No message' }) };
+    const { message, uid } = JSON.parse(event.body || '{}');
+    if (!message) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: 'No message received.' }) };
 
     const ownerUID = (process.env.OWNER_UID || '').trim();
     const isOwner  = ownerUID.length > 0 && uid === ownerUID;
     const userId   = isOwner ? 'erez' : (uid || 'guest');
 
-    const platformRules = `RESPONSE STYLE (non-negotiable):
-- Default: 1-3 sentences MAX. Never longer unless user asks "explain more" or "expand".
-- If listing items: bullet points, 3 words per bullet, max 5 bullets.
-- Never repeat what was just said. Never add filler phrases.
-- Never start with "Of course", "Great question", "Certainly" or similar.
-- After giving a short answer: stop. Wait. Let the user lead.
-- Language: respond in the SAME language the user used. Mixed He/En → mixed He/En.
-`;
+    const platformRules = `RESPONSE STYLE:
+- 1-3 sentences MAX unless asked to expand.
+- Bullets: 3 words per bullet, max 5.
+- No filler phrases. No repetition.
+- Language: match user language.`;
 
-    // ── for owner: search memory + build rich context in parallel ──
-    let memoryBlock = '';
-    let userContext = '';
-
+    let systemPrompt;
     if (isOwner) {
-      const memories = await searchMemories(message, userId);
-      if (memories.length > 0) {
-        memoryBlock = `\n\nRELEVANT PAST CONTEXT (from your memory):\n${memories.join('\n---\n')}\n`;
-      }
-
-      userContext = `You are Symbio – Erez Segman's personal AI operating system.
-Active project: ${project || 'general'}.
-Goals: 100K NIS/month across Financia (RE dev+fund, Bat Yam + Herzliya תמ"א projects), Lotar (CT training + farm club), Mortgage Advisory (2% fee min 12,500 NIS), AAF (NGO donations), Tax Liens USA (18%+ annual yield).
-Always prioritize cash flow, lead generation, and deal closure.${memoryBlock}`;
+      const memories = await searchMemories(message, userId).catch(() => []);
+      const memBlock = memories.length > 0 ? `\n\nRELEVANT MEMORY:\n${memories.join('\n---\n')}` : '';
+      systemPrompt = platformRules + `\n\nYou are Symbio — Erez Segman's personal AI OS.
+Goals: 100K NIS/month across Financia (RE dev+fund), Lotar (CT training), Mortgage Advisory (2% fee min 12500 NIS), AAF (NGO), Tax Liens USA (18%+).
+Prioritize: cash flow, leads, deal closure.${memBlock}`;
     } else {
-      userContext = 'You are Symbio – a helpful AI assistant. Answer concisely and helpfully.';
+      systemPrompt = platformRules + '\n\nYou are Symbio — a helpful AI assistant. Answer concisely and helpfully.';
     }
 
-    const system = platformRules + '\n' + userContext;
-
-    // ── call Claude ──
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 400,
-        system,
-        messages: [{ role: 'user', content: message }]
-      })
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 400, system: systemPrompt, messages: [{ role: 'user', content: message }] })
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || `API error ${res.status}`);
-
-    const reply = data.content[0].text;
-
-    // ── parallel: memory store + ambient entity extraction ──
-    let finalReply = reply;
-
-    if (isOwner) {
-      // Memory store — fire and forget
-      storeMemory(message, reply, userId).catch(() => {});
-
-      // Ambient extraction — wait for result to append confirmation
-      try {
-        const extractRes = await Promise.race([
-          fetch(
-          `${process.env.URL || 'https://snazzy-paprenjak-7e69b9.netlify.app'}/.netlify/functions/extract`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userMessage: message, assistantReply: reply, uid })
-          }
-        ),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('extract timeout')), 3000))
-        ]);
-        if (extractRes.ok) {
-          const extractData = await extractRes.json();
-          if (extractData.confirmation) {
-            finalReply = reply + extractData.confirmation;
-          }
-        }
-      } catch(e) {
-        // Extraction failure never breaks the response
-        console.error('[ask/extract]', e.message);
-      }
+    const apiData = await apiRes.json();
+    if (!apiRes.ok) {
+      const errMsg = apiData.error?.message || `API error ${apiRes.status}`;
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: `⚠️ ${errMsg}` }) };
     }
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ reply: finalReply })
-    };
+    const reply = apiData.content?.[0]?.text || 'No response.';
+
+    // Fire-and-forget memory store for owner
+    if (isOwner) storeMemory(message, reply, userId).catch(() => {});
+
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply }) };
 
   } catch(e) {
     console.error('[ask]', e.message);
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: e.message, reply: 'שגיאה: ' + e.message })
-    };
+    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: `⚠️ שגיאה: ${e.message}` }) };
   }
 };
