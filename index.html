@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><circle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%236C47FF%22/></svg>">
 <script>
 // Cache buster v5 — runs before anything else
 (function(){
@@ -27,6 +28,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#080612">
 <title>Symbio</title>
@@ -771,7 +773,7 @@ function buildSRSession() {
   var sentThis = false;
 
   r.onstart = function() {
-    isListening = true; sentThis = false; lastHeard = '';
+    isListening = true; sentThis = false; lastHeard = ''; window._lastSilenceText = '';
     // FIX: Interrupt Symbio if currently speaking
     if (window.speechSynthesis && window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
@@ -813,13 +815,20 @@ function buildSRSession() {
       lastHeard = ''; // prevent double-send
       routeMessage(final2.trim());
     } else if (heard && heard.trim()) {
-      // Silence auto-send: if browser never fires isFinal, stop after 4s of quiet
-      clearTimeout(window._silenceTimer);
-      window._silenceTimer = setTimeout(function(){
-        if (!sentThis && isListening) {
-          try { if (recog) recog.stop(); } catch(_){}  // triggers onend -> sends lastHeard
-        }
-      }, 4000);
+      // Silence auto-send: only (re)start the 4s timer when the TEXT CHANGES.
+      // Chrome fires onresult repeatedly to refine the same phrase; if we reset
+      // on every fire the timer never completes. Resetting only on real change
+      // means: stable transcript for 4s => user stopped talking => send.
+      var nowHeard = heard.trim();
+      if (nowHeard !== window._lastSilenceText) {
+        window._lastSilenceText = nowHeard;
+        clearTimeout(window._silenceTimer);
+        window._silenceTimer = setTimeout(function(){
+          if (!sentThis && isListening) {
+            try { if (recog) recog.stop(); } catch(_){}  // triggers onend -> sends lastHeard
+          }
+        }, 4000);
+      }
     }
   };
 
