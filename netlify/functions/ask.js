@@ -50,6 +50,26 @@ async function resolveUserId(uid, bodyUserId) {
   return { userId: '', firstName: '', source: 'none' };
 }
 
+// Fire-and-forget audit: log the event, never the content. Never blocks the user.
+async function audit(actor, action, resource, detail) {
+  try {
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, 'Prefer': 'return=minimal' };
+    await httpsPost(host, '/rest/v1/audit_log', svc, { actor, action, resource: resource || null, detail: detail || null });
+  } catch(e) {}
+}
+
+// AWARENESS layer: load the user's rolling profile summary (one cheap GET by user_id).
+async function getSummary(userId) {
+  try {
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
+    const r = await httpsGet(host, `/rest/v1/user_summaries?user_id=eq.${encodeURIComponent(userId)}&select=summary&limit=1`, svc);
+    if (Array.isArray(r.body) && r.body[0] && r.body[0].summary) return r.body[0].summary;
+  } catch(e) {}
+  return '';
+}
+
 async function searchMemories(query, userId) {
   const host = new URL(process.env.SUPABASE_URL).hostname;
   const svcHeaders = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
@@ -158,9 +178,19 @@ exports.handler = async (event) => {
 - No filler phrases. No repetition.
 - Language: match user language.`;
 
-    // Phase 1 (§1): memory ON for EVERY valid user, each scoped to their own userId.
-    const memories = await searchMemories(message, userId).catch(() => []);
-    const memBlock = memories.length > 0 ? `\n\nRELEVANT MEMORY:\n${memories.join('\n---\n')}` : '';
+    // Phase 2 (AWARENESS): load the rolling profile + a little semantic memory.
+    // If a profile exists, it carries "who they are" cheaply, so we pull fewer raw chats.
+    const [summary, memories] = await Promise.all([
+      getSummary(userId).catch(() => ''),
+      searchMemories(message, userId).catch(() => [])
+    ]);
+    let memBlock = '';
+    if (summary) memBlock += `\n\nKNOWN ABOUT USER:\n${summary}`;
+    if (memories.length > 0) {
+      // With a profile present, 2 most-relevant raw memories are plenty (token saving).
+      const raw = summary ? memories.slice(0, 2) : memories;
+      memBlock += `\n\nRELEVANT MEMORY:\n${raw.join('\n---\n')}`;
+    }
 
     let systemPrompt;
     if (isOwner) {
@@ -194,6 +224,7 @@ If you do not yet know something about ${name}, say so honestly and ask — neve
 
     // Phase 1 (§1): store memory for EVERY valid user, scoped to their own userId.
     storeMemory(message, reply, userId).catch(() => {});
+    audit(userId, 'memory_write', 'memories', null).catch(() => {});
 
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply }) };
 

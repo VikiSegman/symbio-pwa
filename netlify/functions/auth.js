@@ -6,6 +6,25 @@ const SUPABASE_URL    = process.env.SUPABASE_URL;
 const SUPABASE_ANON   = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SVCKEY = process.env.SUPABASE_SERVICE_KEY;
 
+
+// ── trust helpers (additive, non-blocking — never fail signup) ────────────────
+const CONSENT_VERSION = 'privacy_v1';  // bump when the signup consent text changes
+async function sbServiceInsert(table, row) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_SVCKEY, Authorization: `Bearer ${SUPABASE_SVCKEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(row)
+    });
+  } catch(e) {}
+}
+async function logConsent(userId, granted) {
+  await sbServiceInsert('consent_log', { user_id: userId, consent_type: 'signup_privacy', consent_version: CONSENT_VERSION, granted: !!granted });
+}
+async function audit(actor, action, resource, detail) {
+  await sbServiceInsert('audit_log', { actor, action, resource: resource || null, detail: detail || null });
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 function buildUserId(firstName, lastName, country = '', city = '') {
@@ -69,7 +88,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { action, email, password, firstName, lastName, country, city } = JSON.parse(event.body);
+    const { action, email, password, firstName, lastName, country, city, consent } = JSON.parse(event.body);
 
     // ── SIGNUP ──────────────────────────────────────────────────────────────────
     if (action === 'signup') {
@@ -117,6 +136,13 @@ exports.handler = async (event) => {
           created_at: new Date().toISOString()
         })
       });
+
+      // 4. Trust records (additive, non-blocking — signup succeeds regardless)
+      await Promise.all([
+        logConsent(userId, consent !== false),
+        audit(userId, 'signup', 'user_profiles', null),
+        audit(userId, 'consent_granted', 'consent_log', CONSENT_VERSION)
+      ]).catch(() => {});
 
       return {
         statusCode: 200,
