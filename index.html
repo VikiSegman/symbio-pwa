@@ -249,11 +249,11 @@ function _trackMsg(role, content) {
   _sessionMsgs.push({ role, content: content.slice(0, 500) });
   if (_sessionMsgs.length > 40) _sessionMsgs = _sessionMsgs.slice(-40); // keep last 40
   // Reliable in-session AWARENESS summary: fires while the page is alive (no unload race).
-  // Every 4 turns (8 tracked msgs). Both send paths call _trackMsg, so this always runs.
+  // Every 8 turns (16 tracked msgs) — token-thrifty cadence. Both send paths call _trackMsg.
   try {
     if (role === 'assistant') {
       var _suId2 = localStorage.getItem('symbio_user_id') || '';
-      if (_suId2 && _sessionMsgs.length >= 8 && _sessionMsgs.length % 8 === 0) {
+      if (_suId2 && _sessionMsgs.length >= 16 && _sessionMsgs.length % 16 === 0) {
         fetch('/.netlify/functions/summarize-user', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid: (window._symbioUID || localStorage.getItem('symbio_uid') || ''), userId: _suId2, messages: _sessionMsgs.slice(-30) })
