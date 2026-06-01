@@ -14,21 +14,54 @@ function httpsPost(hostname, path, headers, body) {
   });
 }
 
+function httpsGet(hostname, path, headers) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      { hostname, path, method: 'GET', headers: { ...headers } },
+      (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve({ status: res.statusCode, body: JSON.parse(d) }); } catch(e) { resolve({ status: res.statusCode, body: d }); } }); }
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 async function searchMemories(query, userId) {
+  const host = new URL(process.env.SUPABASE_URL).hostname;
+  const svcHeaders = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
+
+  // 1) RECENCY BASELINE: always pull this user's most recent memories (GET via REST).
+  let recent = [];
+  try {
+    const path = `/rest/v1/memories?user_id=eq.${encodeURIComponent(userId)}&select=content,session_date&order=created_at.desc&limit=3`;
+    const rr = await httpsGet(host, path, svcHeaders);
+    if (Array.isArray(rr.body)) recent = rr.body;
+  } catch(e) {}
+
+  // 2) SEMANTIC MATCH: embed the query and find relevant memories (lower threshold = more recall).
+  let semantic = [];
   try {
     const r = await httpsPost('api.openai.com', '/v1/embeddings',
       { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
       { model: 'text-embedding-3-small', input: query.slice(0, 4000) }
     );
-    if (r.body.error) return [];
-    const embedding = r.body.data[0].embedding;
-    const host = new URL(process.env.SUPABASE_URL).hostname;
-    const r2 = await httpsPost(host, '/rest/v1/rpc/match_memories',
-      { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` },
-      { query_embedding: embedding, match_threshold: 0.72, match_count: 4, filter_user_id: userId }
-    );
-    return (Array.isArray(r2.body) ? r2.body : []).map(m => `[${m.session_date || 'past'}] ${m.content}`);
-  } catch(e) { return []; }
+    if (!r.body.error) {
+      const embedding = r.body.data[0].embedding;
+      const r2 = await httpsPost(host, '/rest/v1/rpc/match_memories', svcHeaders,
+        { query_embedding: embedding, match_threshold: 0.35, match_count: 4, filter_user_id: userId }
+      );
+      if (Array.isArray(r2.body)) semantic = r2.body;
+    }
+  } catch(e) {}
+
+  // 3) MERGE + DEDUPE (semantic first, then recent), cap at 5.
+  const seen = new Set();
+  const out = [];
+  for (const m of [...semantic, ...recent]) {
+    const key = (m.content || '').slice(0, 60);
+    if (key && !seen.has(key)) { seen.add(key); out.push(`[${m.session_date || 'past'}] ${m.content}`); }
+    if (out.length >= 5) break;
+  }
+  return out;
 }
 
 async function storeMemory(userMessage, assistantReply, userId) {
