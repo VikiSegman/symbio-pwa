@@ -257,6 +257,16 @@ function _resetPauseTimer() {
 
 async function _autoSave(trigger) {
   if (_saving || _sessionMsgs.length < 2) return;
+  // AWARENESS: update the user's private rolling profile (Supabase only; all users; fire-and-forget)
+  try {
+    var _suId = localStorage.getItem('symbio_user_id') || '';
+    if (_suId && _sessionMsgs.length >= 4) {
+      fetch('/.netlify/functions/summarize-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: (window._symbioUID || localStorage.getItem('symbio_uid') || ''), userId: _suId, messages: _sessionMsgs })
+      });
+    }
+  } catch(e) {}
   var uid = window._symbioUID || localStorage.getItem('symbio_uid') || '';
   if (!uid) return;
   _saving = true;

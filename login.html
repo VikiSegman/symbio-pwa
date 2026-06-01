@@ -252,7 +252,7 @@ btn.disabled = true; btn.textContent = 'Creating your Symbio...';
 try {
 const res = await fetch('/.netlify/functions/auth', {
 method: 'POST', headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ action: 'signup', email, password, firstName, lastName, country, city })
+body: JSON.stringify({ action: 'signup', email, password, firstName, lastName, country, city, consent: document.getElementById('signup-consent').checked })
 });
 const data = await res.json();
 
