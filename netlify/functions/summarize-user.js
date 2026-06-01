@@ -52,14 +52,17 @@ exports.handler = async (event) => {
 
   try {
     const { uid, userId: bodyUserId, messages } = JSON.parse(event.body || '{}');
+    const _who = bodyUserId || uid || 'unknown';
+    audit(_who, 'summarize_invoked', 'summarize-user', 'msgs=' + (Array.isArray(messages) ? messages.length : 'na')).catch(() => {});
     if (!Array.isArray(messages) || messages.length < 4) {
+      audit(_who, 'summarize_skip', 'too_short', 'msgs=' + (Array.isArray(messages) ? messages.length : 'na')).catch(() => {});
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'too short' }) };
     }
 
     const ownerUID = (process.env.OWNER_UID || '').trim();
     const isOwner  = ownerUID.length > 0 && uid === ownerUID;
     const userId = isOwner ? 'erez' : await resolveUserId(uid, bodyUserId);
-    if (!userId) return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'no user' }) };
+    if (!userId) { audit(_who, 'summarize_skip', 'no_user', null).catch(() => {}); return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'no user' }) }; }
 
     const host = new URL(process.env.SUPABASE_URL).hostname;
     const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
@@ -93,7 +96,7 @@ Return ONLY the updated profile text, nothing else.`;
       { model: 'claude-haiku-4-5', max_tokens: 400, messages: [{ role: 'user', content: prompt }] });
 
     const newSummary = (ai.body && ai.body.content && ai.body.content[0] && ai.body.content[0].text || '').trim();
-    if (!newSummary) return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'summarize failed' }) };
+    if (!newSummary) { audit(userId, 'summarize_skip', 'ai_empty', 'aiStatus=' + (ai.status || '?')).catch(() => {}); return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'summarize failed' }) }; }
 
     // Upsert (PK = user_id). Prefer: resolution=merge-duplicates updates the row.
     const upHeaders = { ...svc, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' };
@@ -106,6 +109,7 @@ Return ONLY the updated profile text, nothing else.`;
 
   } catch(e) {
     console.error('[summarize-user]', e.message);
+    audit('system', 'summarize_error', 'summarize-user', (e.message || 'err').slice(0, 200)).catch(() => {});
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, error: e.message }) };
   }
 };
