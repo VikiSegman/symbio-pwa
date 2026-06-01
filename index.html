@@ -977,12 +977,49 @@ function doSpeak(text) {
   if (msgs.length > 0) speakText(msgs[msgs.length-1].textContent);
 }
 
-function startListening() {
+function _actuallyStart() {
   if (isListening || isSending) return;
   recog = buildSRSession();
-  if (!recog) return;
+  if (!recog) { showVtxt('❌ זיהוי דיבור לא זמין בדפדפן', '#FF6060'); return; }
   try { lastHeard = ''; recog.lang = voiceLang; recog.start(); }
-  catch(e) { setTimeout(function(){ if(!isListening) try{if(recog)recog.start();}catch(e2){} }, 500); }
+  catch(e) {
+    // start() can throw if a prior session is still closing — retry once
+    setTimeout(function(){
+      if (!isListening) { try { if (recog) recog.start(); } catch(e2) {
+        showVtxt('❌ לא ניתן להפעיל מיקרופון', '#FF6060');
+        setTimeout(function(){ showVtxt('',''); }, 4000);
+      } }
+    }, 500);
+  }
+}
+
+function startListening() {
+  if (isListening || isSending) return;
+  // Ensure mic permission before starting recognition (fixes silent no-op)
+  if (window._micGranted) { _actuallyStart(); return; }
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    showVtxt('🎤 מבקש גישה למיקרופון...', 'rgba(255,255,255,.4)');
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream){
+        window._micGranted = true;
+        // Release the stream immediately — SpeechRecognition opens its own
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        _actuallyStart();
+      })
+      .catch(function(err){
+        window._micGranted = false;
+        var msg = (err && err.name === 'NotAllowedError')
+          ? '❌ גישה למיקרופון נחסמה — אשר בהגדרות הדפדפן'
+          : '❌ אין מיקרופון זמין';
+        showVtxt(msg, '#FF6060');
+        setTimeout(function(){ showVtxt('',''); }, 5000);
+        isListening = false; setMicUI(false);
+        if (CONV.state !== 'active') setFaceState('idle');
+      });
+  } else {
+    // Old browser — try directly
+    _actuallyStart();
+  }
 }
 
 function toggleListen() {
