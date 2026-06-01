@@ -261,10 +261,12 @@ async function _autoSave(trigger) {
   try {
     var _suId = localStorage.getItem('symbio_user_id') || '';
     if (_suId && _sessionMsgs.length >= 4) {
-      fetch('/.netlify/functions/summarize-user', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: (window._symbioUID || localStorage.getItem('symbio_uid') || ''), userId: _suId, messages: _sessionMsgs })
-      });
+      var _suPayload = JSON.stringify({ uid: (window._symbioUID || localStorage.getItem('symbio_uid') || ''), userId: _suId, messages: _sessionMsgs.slice(-30) });
+      var _suSent = false;
+      try { _suSent = !!(navigator.sendBeacon && navigator.sendBeacon('/.netlify/functions/summarize-user', new Blob([_suPayload], { type: 'application/json' }))); } catch(e) {}
+      if (!_suSent) {
+        fetch('/.netlify/functions/summarize-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: _suPayload, keepalive: true });
+      }
     }
   } catch(e) {}
   var uid = window._symbioUID || localStorage.getItem('symbio_uid') || '';
@@ -301,6 +303,11 @@ doLogout = async function() {
   try { await _autoSave('logout'); } catch(_){}
   _origLogout();
 };
+
+// Also save on tab-close / app-background (not just the logout button).
+// sendBeacon inside _autoSave guarantees the summary survives page unload.
+window.addEventListener('pagehide', function(){ try { _autoSave('pagehide'); } catch(_){} });
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') { try { _autoSave('hidden'); } catch(_){} } });
 
 
 
