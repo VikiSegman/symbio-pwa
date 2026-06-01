@@ -812,6 +812,14 @@ function buildSRSession() {
       sentThis = true;
       lastHeard = ''; // prevent double-send
       routeMessage(final2.trim());
+    } else if (heard && heard.trim()) {
+      // Silence auto-send: if browser never fires isFinal, stop after 4s of quiet
+      clearTimeout(window._silenceTimer);
+      window._silenceTimer = setTimeout(function(){
+        if (!sentThis && isListening) {
+          try { if (recog) recog.stop(); } catch(_){}  // triggers onend -> sends lastHeard
+        }
+      }, 4000);
     }
   };
 
@@ -830,6 +838,7 @@ function buildSRSession() {
   };
 
   r.onend = function() {
+    clearTimeout(window._silenceTimer);
     isListening = false; setMicUI(false);
     // Fallback send if isFinal never fired
     if (!sentThis && lastHeard && lastHeard.trim()) {
@@ -934,6 +943,11 @@ async function dispatchVoice(msg, withContext) {
 function speakText(text) {
   if (!text || !window.speechSynthesis) { setFaceState('idle'); return; }
   try {
+    // Prevent echo: stop the mic so Symbio doesn't hear its own voice
+    window._botSpeaking = true;
+    clearTimeout(window._silenceTimer);
+    if (isListening && recog) { try { recog.stop(); } catch(_){} }
+    isListening = false; setMicUI(false);
     window.speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(text);
     var isHeb = /[\u0590-\u05FF]/.test(text);
@@ -942,16 +956,18 @@ function speakText(text) {
     setFaceState('speaking');
     document.getElementById('spkBtn').textContent = '⏹ Stop';
     u.onend = function() {
+      window._botSpeaking = false;
       setFaceState('idle');
-      document.getElementById('spkBtn').textContent = '▶ Speak';
-      // Resume listening after speaking
+      var sb = document.getElementById('spkBtn'); if (sb) sb.textContent = '▶ Speak';
+      // Resume listening only after Symbio finished speaking (avoids echo)
       if (!isListening && (window.continuousMode || CONV.state === 'active')) {
-        setTimeout(startListening, 600);
+        setTimeout(function(){ if (!window._botSpeaking && !isListening) startListening(); }, 700);
       }
     };
     u.onerror = function() {
+      window._botSpeaking = false;
       setFaceState('idle');
-      document.getElementById('spkBtn').textContent = '▶ Speak';
+      var sb = document.getElementById('spkBtn'); if (sb) sb.textContent = '▶ Speak';
     };
     function go() {
       var vs = window.speechSynthesis.getVoices();
@@ -1026,9 +1042,15 @@ function startListening() {
 
 function toggleListen() {
   if (isListening) {
+    // STOP = fully end the session (not just pause, or it auto-restarts)
+    clearTimeout(window._silenceTimer);
+    window.manualListenActive = false;
     if (recog) try { recog.stop(); } catch(e) {}
+    if (window.speechSynthesis) try { window.speechSynthesis.cancel(); } catch(e){}
+    window._botSpeaking = false;
     isListening = false; setMicUI(false);
-    if (CONV.state !== 'active') setFaceState('idle');
+    setConvState('dormant');   // ends countdown + stops auto-restart
+    setFaceState('idle');
     lastHeard = ''; showVtxt('', ''); return;
   }
   // Manual click = user is addressing Symbio directly
