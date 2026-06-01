@@ -195,6 +195,13 @@ body.light #alertBanner{background:linear-gradient(135deg,#e74c3c,#c0392b);}
 </div>
 </div>
 <script>
+// === SAFETY PRELUDE — critical state defined first so a later top-level
+// throw can never leave these undefined (prevents toggleListen/swTab crashes) ===
+var CONV = {
+  state: 'dormant', timer: null, endTimer: null, countTimer: null,
+  remaining: 60, contextBuffer: [], TIMEOUT: 60, GRACE: 10
+};
+var tabLoaded = { C:false, I:false, J:false, Pip:false };
 // Auth guard — redirect to login if no session (skip for erez)
 const _uid = localStorage.getItem('symbio_user_id');
 const _ses = localStorage.getItem('symbio_session');
@@ -273,9 +280,13 @@ async function _autoSave(trigger) {
 }
 
 // Intercept the existing doLogout — save first, then proceed
-var _origLogout = doLogout;
+// Guarded: only wrap if original exists, so a missing/late original can't crash load
+var _origLogout = (typeof doLogout === 'function') ? doLogout : function(){
+  try { localStorage.clear(); } catch(_){}
+  window.location.href = '/login.html';
+};
 doLogout = async function() {
-  await _autoSave('logout');
+  try { await _autoSave('logout'); } catch(_){}
   _origLogout();
 };
 
@@ -653,17 +664,8 @@ var recog = null, bgRecog = null;
 var isListening = false, isSending = false;
 var lastHeard = '', voiceLang = 'he-IL';
 
-// === CONVERSATION STATE MACHINE ===
-var CONV = {
-  state: 'dormant', // dormant | active | ending
-  timer: null,
-  endTimer: null,
-  countTimer: null,
-  remaining: 60,
-  contextBuffer: [], // background learning — stores last 20 heard phrases
-  TIMEOUT: 60,       // seconds before ending
-  GRACE: 10          // seconds warning before dormant
-};
+// === CONVERSATION STATE MACHINE === (CONV already defined in safety prelude)
+CONV.state = 'dormant'; // dormant | active | ending
 
 var WAKE = [
   'סימביו','symbio','היי סימביו','hey symbio',
@@ -1108,7 +1110,7 @@ async function sendMsg(){
 
 
 // ============ LIVE DATA TABS ============
-var tabLoaded={C:false,I:false,J:false,Pip:false};
+tabLoaded={C:false,I:false,J:false,Pip:false}; // (declared in safety prelude)
 
 function swTab(el){
   document.querySelectorAll('.tb').forEach(function(t){t.classList.remove('act');});
