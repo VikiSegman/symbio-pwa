@@ -1,4 +1,4 @@
-const CACHE = 'symbio-v7';
+const CACHE = 'symbio-v8';
 const STATIC = ['/manifest.json'];
 
 self.addEventListener('install', e => {
