@@ -1124,7 +1124,7 @@ async function sendMsg(){
     var res=await fetch('/.netlify/functions/ask',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,uid:uid,userFirstName:localStorage.getItem('symbio_first_name')||''})
+      body:JSON.stringify({message:msg,uid:uid,userFirstName:localStorage.getItem('symbio_first_name')||'',userId:localStorage.getItem('symbio_user_id')||''})
     });
     var raw=await res.text();
     var data;
