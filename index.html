@@ -436,10 +436,10 @@ var fT=0, fLT=0;
 var neurons=[], tendrilPts=[], synapses=[], floatIns=[], consMem=[];
 
 function setFaceState(s){
-  if(!SACT[s])return;
+  try{if(!SACT||!SACT[s])return;}catch(_){return;}
   fcur=s;
   tAct=[...SACT[s]];
-  document.getElementById('fs').textContent=s.charAt(0).toUpperCase()+s.slice(1);
+  try{var el=document.getElementById('fs');if(el)el.textContent=s.charAt(0).toUpperCase()+s.slice(1);}catch(_){}
 }
 
 function szFC(){
@@ -642,6 +642,13 @@ else{fpImg.onload=startBrain;fpImg.onerror=startBrain;}
 
 // ============ VOICE SYSTEM v5 — WAKE WORD + CONVERSATION STATE ============
 var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+// Voice availability check
+(function(){
+  var micBtn = document.getElementById('micBtn');
+  if(!SR){
+    if(micBtn){ micBtn.textContent='🎤 N/A'; micBtn.title='Speech recognition not available in this browser'; micBtn.style.opacity='0.4'; micBtn.disabled=true; }
+  }
+})();
 var recog = null, bgRecog = null;
 var isListening = false, isSending = false;
 var lastHeard = '', voiceLang = 'he-IL';
@@ -904,7 +911,9 @@ async function dispatchVoice(msg, withContext) {
       body: JSON.stringify({message: fullMsg, uid: window._symbioUID||'', userFirstName: localStorage.getItem('symbio_first_name') || '', userId: localStorage.getItem('symbio_user_id') || ''})
     });
     _trackMsg('user', fullMsg); _resetPauseTimer();
-    var data = await res.json();
+    var raw2 = await res.text();
+    var data;
+    try{ data = JSON.parse(raw2); }catch(_){ data = {reply: 'שגיאת תגובה'}; }
     var reply = data.reply || data.error || 'אין תגובה';
     addMsg(reply, 'a');
     _trackMsg('assistant', reply); _sessionTurns++; if(_sessionTurns % 10 === 0) _autoSave('turns');
