@@ -137,6 +137,10 @@ Continue with Google
 <button class="eye-btn" onclick="togglePwd('signup-confirm',this)" tabindex="-1">👁</button>
 </div>
 </div>
+<div class="form-group" style="display:flex;align-items:flex-start;gap:8px;font-size:0.8rem;color:#888;">
+<input type="checkbox" id="signup-consent" style="margin-top:3px;">
+<label for="signup-consent" style="line-height:1.4;">I agree that Symbio may securely store my conversations to provide my private, personalized memory. My data stays private to me and is never sold or shared. I can request deletion anytime.</label>
+</div>
 <button class="btn" id="signup-btn" onclick="doSignup()">Create My Symbio →</button>
 <div class="divider">— or —</div>
 <button class="btn-google" onclick="doGoogle()">
@@ -236,6 +240,9 @@ errEl.textContent = ''; sucEl.textContent = '';
 
 if (!firstName || !lastName || !email || !password) {
 errEl.textContent = 'First name, last name, email and password are required.'; return;
+}
+if (!document.getElementById('signup-consent').checked) {
+errEl.textContent = 'Please agree to the privacy terms to create your Symbio.'; return;
 }
 if (password.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; return; }
 if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
