@@ -24,7 +24,7 @@ async function searchMemories(query, userId) {
     const embedding = r.body.data[0].embedding;
     const host = new URL(process.env.SUPABASE_URL).hostname;
     const r2 = await httpsPost(host, '/rest/v1/rpc/match_memories',
-      { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}` },
+      { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` },
       { query_embedding: embedding, match_threshold: 0.72, match_count: 4, filter_user_id: userId }
     );
     return (Array.isArray(r2.body) ? r2.body : []).map(m => `[${m.session_date || 'past'}] ${m.content}`);
@@ -42,7 +42,7 @@ async function storeMemory(userMessage, assistantReply, userId) {
     if (r.body.error) return;
     const host = new URL(process.env.SUPABASE_URL).hostname;
     await httpsPost(host, '/rest/v1/memories',
-      { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
+      { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, 'Prefer': 'return=minimal' },
       { user_id: userId, content, embedding: r.body.data[0].embedding, memory_type: 'conversation', session_date: new Date().toISOString().split('T')[0] }
     );
   } catch(e) {}
