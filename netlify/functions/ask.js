@@ -55,12 +55,21 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const { message, uid } = JSON.parse(event.body || '{}');
+    // Phase 1 (§1): also read userFirstName + userId already sent by the frontend
+    const { message, uid, userFirstName, userId: bodyUserId } = JSON.parse(event.body || '{}');
     if (!message) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: 'No message received.' }) };
 
     const ownerUID = (process.env.OWNER_UID || '').trim();
     const isOwner  = ownerUID.length > 0 && uid === ownerUID;
-    const userId   = isOwner ? 'erez' : (uid || 'guest');
+
+    // Phase 1 (§4): NO shared 'guest' pool. Require a real, unique identity.
+    // Every user is scoped to their OWN id so memory stays private and isolated.
+    const realId = (bodyUserId || uid || '').trim();
+    if (!isOwner && !realId) {
+      return { statusCode: 200, headers: CORS,
+        body: JSON.stringify({ reply: '⚠️ Please sign in — Symbio keeps each person\'s memory private and separate, so it needs your account first.' }) };
+    }
+    const userId = isOwner ? 'erez' : realId;
 
     const platformRules = `RESPONSE STYLE:
 - 1-3 sentences MAX unless asked to expand.
@@ -68,15 +77,24 @@ exports.handler = async (event) => {
 - No filler phrases. No repetition.
 - Language: match user language.`;
 
+    // Phase 1 (§1): memory ON for EVERY valid user, each scoped to their own userId.
+    const memories = await searchMemories(message, userId).catch(() => []);
+    const memBlock = memories.length > 0 ? `\n\nRELEVANT MEMORY:\n${memories.join('\n---\n')}` : '';
+
     let systemPrompt;
     if (isOwner) {
-      const memories = await searchMemories(message, userId).catch(() => []);
-      const memBlock = memories.length > 0 ? `\n\nRELEVANT MEMORY:\n${memories.join('\n---\n')}` : '';
+      // Owner: full OS persona + Erez's goals (kept owner-only — §3, no goal bleed).
       systemPrompt = platformRules + `\n\nYou are Symbio — Erez Segman's personal AI OS.
 Goals: 100K NIS/month across Financia (RE dev+fund), Lotar (CT training), Mortgage Advisory (2% fee min 12500 NIS), AAF (NGO), Tax Liens USA (18%+).
 Prioritize: cash flow, leads, deal closure.${memBlock}`;
     } else {
-      systemPrompt = platformRules + '\n\nYou are Symbio — a helpful AI assistant. Answer concisely and helpfully.';
+      // Phase 1 (§1, §3, §11e, §14h): every user gets their OWN dedicated Symbio,
+      // personalized by name from registration, with NO owner goals, plus the honesty rule.
+      const who  = userFirstName ? `${userFirstName}'s` : 'your';
+      const name = userFirstName || 'you';
+      systemPrompt = platformRules + `\n\nYou are Symbio — ${who} own personal AI that learns and grows with ${name} over time.
+You remember across sessions and build a private, dedicated relationship. You DO have memory — never claim you have none.
+If you do not yet know something about ${name}, say so honestly and ask — never guess or invent facts.${memBlock}`;
     }
 
     const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -93,8 +111,8 @@ Prioritize: cash flow, leads, deal closure.${memBlock}`;
 
     const reply = apiData.content?.[0]?.text || 'No response.';
 
-    // Fire-and-forget memory store for owner
-    if (isOwner) storeMemory(message, reply, userId).catch(() => {});
+    // Phase 1 (§1): store memory for EVERY valid user, scoped to their own userId.
+    storeMemory(message, reply, userId).catch(() => {});
 
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply }) };
 
