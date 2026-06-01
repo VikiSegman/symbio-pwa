@@ -25,6 +25,30 @@ function httpsGet(hostname, path, headers) {
   });
 }
 
+// Resolve ONE canonical user_id per human, so memory never scatters across
+// uid vs user_id. Looks up user_profiles by supabase_uid (the uid) and returns
+// the stable text user_id. Falls back to the explicit bodyUserId if given.
+async function resolveUserId(uid, bodyUserId) {
+  const explicit = (bodyUserId || '').trim();
+  const rawUid = (uid || '').trim();
+  // Prefer profile lookup by uid (most reliable, path-independent).
+  if (rawUid) {
+    try {
+      const host = new URL(process.env.SUPABASE_URL).hostname;
+      const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
+      const path = `/rest/v1/user_profiles?supabase_uid=eq.${encodeURIComponent(rawUid)}&select=user_id,first_name&limit=1`;
+      const r = await httpsGet(host, path, svc);
+      if (Array.isArray(r.body) && r.body[0] && r.body[0].user_id) {
+        return { userId: r.body[0].user_id, firstName: r.body[0].first_name || '', source: 'profile' };
+      }
+    } catch(e) {}
+  }
+  // Fallbacks: explicit bodyUserId, else the raw uid (last resort).
+  if (explicit) return { userId: explicit, firstName: '', source: 'body' };
+  if (rawUid)   return { userId: rawUid,   firstName: '', source: 'uid' };
+  return { userId: '', firstName: '', source: 'none' };
+}
+
 async function searchMemories(query, userId) {
   const host = new URL(process.env.SUPABASE_URL).hostname;
   const svcHeaders = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
@@ -76,81 +100,4 @@ async function storeMemory(userMessage, assistantReply, userId) {
     const host = new URL(process.env.SUPABASE_URL).hostname;
     await httpsPost(host, '/rest/v1/memories',
       { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, 'Prefer': 'return=minimal' },
-      { user_id: userId, content, embedding: r.body.data[0].embedding, memory_type: 'conversation', session_date: new Date().toISOString().split('T')[0] }
-    );
-  } catch(e) {}
-}
-
-const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
-
-exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
-
-  try {
-    // Phase 1 (§1): also read userFirstName + userId already sent by the frontend
-    const { message, uid, userFirstName, userId: bodyUserId } = JSON.parse(event.body || '{}');
-    if (!message) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: 'No message received.' }) };
-
-    const ownerUID = (process.env.OWNER_UID || '').trim();
-    const isOwner  = ownerUID.length > 0 && uid === ownerUID;
-
-    // Phase 1 (§4): NO shared 'guest' pool. Require a real, unique identity.
-    // Every user is scoped to their OWN id so memory stays private and isolated.
-    const realId = (bodyUserId || uid || '').trim();
-    if (!isOwner && !realId) {
-      return { statusCode: 200, headers: CORS,
-        body: JSON.stringify({ reply: '⚠️ Please sign in — Symbio keeps each person\'s memory private and separate, so it needs your account first.' }) };
-    }
-    const userId = isOwner ? 'erez' : realId;
-
-    const platformRules = `RESPONSE STYLE:
-- 1-3 sentences MAX unless asked to expand.
-- Bullets: 3 words per bullet, max 5.
-- No filler phrases. No repetition.
-- Language: match user language.`;
-
-    // Phase 1 (§1): memory ON for EVERY valid user, each scoped to their own userId.
-    const memories = await searchMemories(message, userId).catch(() => []);
-    const memBlock = memories.length > 0 ? `\n\nRELEVANT MEMORY:\n${memories.join('\n---\n')}` : '';
-
-    let systemPrompt;
-    if (isOwner) {
-      // Owner: full OS persona + Erez's goals (kept owner-only — §3, no goal bleed).
-      systemPrompt = platformRules + `\n\nYou are Symbio — Erez Segman's personal AI OS.
-Goals: 100K NIS/month across Financia (RE dev+fund), Lotar (CT training), Mortgage Advisory (2% fee min 12500 NIS), AAF (NGO), Tax Liens USA (18%+).
-Prioritize: cash flow, leads, deal closure.${memBlock}`;
-    } else {
-      // Phase 1 (§1, §3, §11e, §14h): every user gets their OWN dedicated Symbio,
-      // personalized by name from registration, with NO owner goals, plus the honesty rule.
-      const who  = userFirstName ? `${userFirstName}'s` : 'your';
-      const name = userFirstName || 'you';
-      systemPrompt = platformRules + `\n\nYou are Symbio — ${who} own personal AI that learns and grows with ${name} over time.
-You remember across sessions and build a private, dedicated relationship. You DO have memory — never claim you have none.
-If you do not yet know something about ${name}, say so honestly and ask — never guess or invent facts.${memBlock}`;
-    }
-
-    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 400, system: systemPrompt, messages: [{ role: 'user', content: message }] })
-    });
-
-    const apiData = await apiRes.json();
-    if (!apiRes.ok) {
-      const errMsg = apiData.error?.message || `API error ${apiRes.status}`;
-      return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: `⚠️ ${errMsg}` }) };
-    }
-
-    const reply = apiData.content?.[0]?.text || 'No response.';
-
-    // Phase 1 (§1): store memory for EVERY valid user, scoped to their own userId.
-    storeMemory(message, reply, userId).catch(() => {});
-
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply }) };
-
-  } catch(e) {
-    console.error('[ask]', e.message);
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: `⚠️ שגיאה: ${e.message}` }) };
-  }
-};
+      { user_id: userId, content, embedding: r.body.data[0].embedding, memory_type: 'conversation', session_date: new Date
