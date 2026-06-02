@@ -1520,32 +1520,49 @@ async function grpRefresh(){
       + '</div></div>';
   }).join('');
 }
+var _grpBusy=false;
 async function grpCreate(){
+  if(_grpBusy) return;
   var name=document.getElementById('grpName').value.trim(); var type=document.getElementById('grpType').value;
   if(!name){ _grpSay('Enter a group name',false); return; }
-  var d=await _grpCall({action:'create_group',name:name,type:type});
-  if(d.error){ _grpSay(d.error,false); return; }
-  document.getElementById('grpName').value=''; _grpSay('Group created \u2713',true); grpRefresh();
+  _grpBusy=true;
+  try{
+    var d=await _grpCall({action:'create_group',name:name,type:type});
+    if(d.error){ _grpSay(d.error,false); return; }
+    document.getElementById('grpName').value=''; _grpSay('Group created \u2713',true); grpRefresh();
+  } finally { _grpBusy=false; }
 }
 async function grpJoin(){
+  if(_grpBusy) return;
   var code=document.getElementById('grpCode').value.trim();
   if(!code){ _grpSay('Enter an invite code',false); return; }
-  var d=await _grpCall({action:'join_group',invite_code:code});
-  if(d.error){ _grpSay(d.error,false); return; }
-  document.getElementById('grpCode').value=''; _grpSay('Joined '+((d.group&&d.group.name)||'group')+' \u2713',true); grpRefresh();
+  _grpBusy=true;
+  try{
+    var d=await _grpCall({action:'join_group',invite_code:code});
+    if(d.error){ _grpSay(d.error,false); return; }
+    document.getElementById('grpCode').value=''; _grpSay('Joined '+((d.group&&d.group.name)||'group')+' \u2713',true); grpRefresh();
+  } finally { _grpBusy=false; }
 }
 async function grpLeave(id){
+  if(_grpBusy) return;
   if(!confirm('Leave this group? You will lose access to its shared notes.')) return;
-  var d=await _grpCall({action:'leave_group',group_id:id});
-  if(d.error){ _grpSay(d.error,false); return; }
-  _grpSay('Left group',true); grpRefresh();
+  _grpBusy=true;
+  try{
+    var d=await _grpCall({action:'leave_group',group_id:id});
+    if(d.error){ _grpSay(d.error,false); return; }
+    _grpSay('Left group',true); grpRefresh();
+  } finally { _grpBusy=false; }
 }
 async function grpPostNote(id){
+  if(_grpBusy) return;
   var inp=document.getElementById('note_'+id); var text=inp.value.trim();
   if(!text){ _grpSay('Type a note first',false); return; }
-  var d=await _grpCall({action:'post_group_note',group_id:id,text:text});
-  if(d.error){ _grpSay(d.error,false); return; }
-  inp.value=''; _grpSay('Shared with group \u2713',true);
+  _grpBusy=true;
+  try{
+    var d=await _grpCall({action:'post_group_note',group_id:id,text:text});
+    if(d.error){ _grpSay(d.error,false); return; }
+    inp.value=''; _grpSay('Shared with group \u2713',true);
+  } finally { _grpBusy=false; }
 }
 </script>
 </body></html>
