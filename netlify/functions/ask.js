@@ -80,12 +80,14 @@ async function getGroupMemories(userId) {
     const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
     const gm = await httpsGet(host, `/rest/v1/group_members?user_id=eq.${encodeURIComponent(userId)}&select=group_id`, svc);
     if (!Array.isArray(gm.body) || gm.body.length === 0) return [];
-    const ids = gm.body.map(r => r.group_id).filter(Boolean);
-    if (ids.length === 0) return [];
-    const inList = ids.map(encodeURIComponent).join(',');
-    // Most-recent group-shared memories for the user's groups (cap 3). scope='group' only.
-    const r = await httpsGet(host, `/rest/v1/memories?scope=eq.group&group_id=in.(${inList})&select=content,session_date&order=created_at.desc&limit=3`, svc);
-    if (Array.isArray(r.body)) return r.body;
+    const ids = gm.body.map(r => r.group_id).filter(Boolean).slice(0, 5);
+    // Per-group query with the proven =eq. filter (avoids PostgREST in.() quirks). scope='group' only.
+    const out = [];
+    for (const gid of ids) {
+      const r = await httpsGet(host, `/rest/v1/memories?group_id=eq.${encodeURIComponent(gid)}&scope=eq.group&select=content,session_date&order=created_at.desc&limit=3`, svc);
+      if (Array.isArray(r.body)) for (const m of r.body) out.push(m);
+    }
+    return out.slice(0, 4);
   } catch(e) {}
   return [];
 }
@@ -180,6 +182,9 @@ exports.handler = async (event) => {
       let recentCount = -1, semErr = null;
       try { const probe = await searchMemories('what do you remember about me', userId); recentCount = probe.length; }
       catch(e){ semErr = e.message; }
+      let grpInfo = '';
+      try { const gmx = await getGroupMemories(userId); grpInfo = '\ngroup notes found: ' + gmx.length + (gmx.length ? ('\nfirst group note: ' + ((gmx[0].content||'').slice(0,40))) : ''); }
+      catch(e){ grpInfo = '\ngroup probe error: ' + e.message; }
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply:
         'DEBUG\n' +
         'received uid: ' + (uid||'(none)') + '\n' +
@@ -188,7 +193,7 @@ exports.handler = async (event) => {
         'isOwner: ' + isOwner + '\n' +
         'RESOLVED user_id: ' + (userId||'(none)') + '  [source: ' + resolved.source + ']\n' +
         'resolved firstName: ' + (fname||'(none)') + '\n' +
-        'memories found for this user_id: ' + recentCount + (semErr ? ('\nsearch error: ' + semErr) : '')
+        'memories found for this user_id: ' + recentCount + (semErr ? ('\nsearch error: ' + semErr) : '') + grpInfo
       }) };
     }
 
