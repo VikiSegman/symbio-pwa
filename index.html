@@ -144,6 +144,7 @@ body.light #alertBanner{background:linear-gradient(135deg,#e74c3c,#c0392b);}
     <div id="hdrR">
       <span id="userNameDisplay" style="font-size:0.75rem;color:#888;margin-right:8px;"></span>
       <span id="logo">SYMBIO</span>
+      <button id="groupsBtn" onclick="openGroups()" title="Groups" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#ccc;cursor:pointer;padding:3px 10px;font-size:12px;margin-right:6px;">👥</button>
       <button id="logoutBtn" onclick="doLogout()" title="Logout">יציאה</button>
       <div id="sdot"></div>
     </div>
@@ -1455,5 +1456,86 @@ function doLogout(){
   window.location.href='/login.html';
 }
 
+</script>
+<div id="groupsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#15161a;border:1px solid rgba(255,255,255,.12);border-radius:12px;width:min(440px,92vw);max-height:86vh;overflow:auto;padding:18px;color:#ddd;font-size:13px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <strong style="font-size:15px;">\ud83d\udc65 Groups</strong>
+      <span onclick="closeGroups()" style="cursor:pointer;color:#888;font-size:18px;">\u2715</span>
+    </div>
+    <div style="color:#888;font-size:11px;margin-bottom:12px;">Notes you post are visible to everyone in that group. Your private chat stays private.</div>
+    <div id="grpList" style="margin-bottom:14px;">Loading\u2026</div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:12px 0;">
+    <div style="margin-bottom:10px;">
+      <div style="color:#aaa;margin-bottom:4px;">Create a group</div>
+      <input id="grpName" placeholder="Group name" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#eee;padding:6px 8px;margin-bottom:6px;">
+      <select id="grpType" style="width:100%;box-sizing:border-box;background:#15161a;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#eee;padding:6px 8px;margin-bottom:6px;">
+        <option value="family">Family</option><option value="org">Organization</option><option value="team">Team</option><option value="community">Community</option><option value="school">School</option><option value="university">University</option><option value="ngo">NGO</option><option value="club">Club</option>
+      </select>
+      <button onclick="grpCreate()" style="width:100%;background:#2a6;border:none;border-radius:6px;color:#fff;padding:7px;cursor:pointer;">Create</button>
+    </div>
+    <div>
+      <div style="color:#aaa;margin-bottom:4px;">Join by invite code</div>
+      <input id="grpCode" placeholder="invite code" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#eee;padding:6px 8px;margin-bottom:6px;">
+      <button onclick="grpJoin()" style="width:100%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#eee;padding:7px;cursor:pointer;">Join</button>
+    </div>
+    <div id="grpMsg" style="margin-top:10px;color:#8c8;font-size:12px;min-height:14px;"></div>
+  </div>
+</div>
+<script>
+function _grpToken(){ try{ return (JSON.parse(localStorage.getItem('symbio_session')||'{}')).access_token || ''; }catch(e){ return ''; } }
+async function _grpCall(body){
+  body.accessToken = _grpToken();
+  var r = await fetch('/.netlify/functions/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  return r.json();
+}
+function openGroups(){ document.getElementById('groupsModal').style.display='flex'; grpRefresh(); }
+function closeGroups(){ document.getElementById('groupsModal').style.display='none'; }
+function _grpSay(m,ok){ var e=document.getElementById('grpMsg'); e.style.color=ok?'#8c8':'#e88'; e.textContent=m; }
+function _grpEsc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+async function grpRefresh(){
+  var el=document.getElementById('grpList'); el.textContent='Loading\u2026';
+  var d=await _grpCall({action:'list_my_groups'});
+  if(d.error){ el.textContent=''; _grpSay(d.error,false); return; }
+  if(!d.groups||!d.groups.length){ el.innerHTML='<span style="color:#888;">No groups yet. Create one or join with a code.</span>'; return; }
+  el.innerHTML = d.groups.map(function(g){
+    var code = g.invite_code ? '<div style="color:#888;font-size:11px;margin-top:2px;">invite code: <code style="color:#9c9;">'+_grpEsc(g.invite_code)+'</code></div>' : '';
+    return '<div style="border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px;margin-bottom:8px;">'
+      + '<div style="display:flex;justify-content:space-between;"><strong>'+_grpEsc(g.name)+'</strong><span style="color:#888;font-size:11px;">'+_grpEsc(g.type)+' \u00b7 '+_grpEsc(g.role)+'</span></div>'
+      + code
+      + '<div style="display:flex;gap:6px;margin-top:6px;">'
+      + '<input id="note_'+g.id+'" placeholder="Share a note with this group\u2026" style="flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:#eee;padding:5px 7px;font-size:12px;">'
+      + '<button onclick="grpPostNote(\''+g.id+'\')" style="background:#2a6;border:none;border-radius:6px;color:#fff;padding:5px 10px;cursor:pointer;">Post</button>'
+      + '<button onclick="grpLeave(\''+g.id+'\')" style="background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.3);border-radius:6px;color:#f99;padding:5px 8px;cursor:pointer;">Leave</button>'
+      + '</div></div>';
+  }).join('');
+}
+async function grpCreate(){
+  var name=document.getElementById('grpName').value.trim(); var type=document.getElementById('grpType').value;
+  if(!name){ _grpSay('Enter a group name',false); return; }
+  var d=await _grpCall({action:'create_group',name:name,type:type});
+  if(d.error){ _grpSay(d.error,false); return; }
+  document.getElementById('grpName').value=''; _grpSay('Group created \u2713',true); grpRefresh();
+}
+async function grpJoin(){
+  var code=document.getElementById('grpCode').value.trim();
+  if(!code){ _grpSay('Enter an invite code',false); return; }
+  var d=await _grpCall({action:'join_group',invite_code:code});
+  if(d.error){ _grpSay(d.error,false); return; }
+  document.getElementById('grpCode').value=''; _grpSay('Joined '+((d.group&&d.group.name)||'group')+' \u2713',true); grpRefresh();
+}
+async function grpLeave(id){
+  if(!confirm('Leave this group? You will lose access to its shared notes.')) return;
+  var d=await _grpCall({action:'leave_group',group_id:id});
+  if(d.error){ _grpSay(d.error,false); return; }
+  _grpSay('Left group',true); grpRefresh();
+}
+async function grpPostNote(id){
+  var inp=document.getElementById('note_'+id); var text=inp.value.trim();
+  if(!text){ _grpSay('Type a note first',false); return; }
+  var d=await _grpCall({action:'post_group_note',group_id:id,text:text});
+  if(d.error){ _grpSay(d.error,false); return; }
+  inp.value=''; _grpSay('Shared with group \u2713',true);
+}
 </script>
 </body></html>
