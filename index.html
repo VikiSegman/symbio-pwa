@@ -1460,11 +1460,11 @@ function doLogout(){
 <div id="groupsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:#15161a;border:1px solid rgba(255,255,255,.12);border-radius:12px;width:min(440px,92vw);max-height:86vh;overflow:auto;padding:18px;color:#ddd;font-size:13px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <strong style="font-size:15px;">\ud83d\udc65 Groups</strong>
-      <span onclick="closeGroups()" style="cursor:pointer;color:#888;font-size:18px;">\u2715</span>
+      <strong style="font-size:15px;">👥 Groups</strong>
+      <span onclick="closeGroups()" style="cursor:pointer;color:#888;font-size:18px;">✕</span>
     </div>
     <div style="color:#888;font-size:11px;margin-bottom:12px;">Notes you post are visible to everyone in that group. Your private chat stays private.</div>
-    <div id="grpList" style="margin-bottom:14px;">Loading\u2026</div>
+    <div id="grpList" style="margin-bottom:14px;">Loading…</div>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:12px 0;">
     <div style="margin-bottom:10px;">
       <div style="color:#aaa;margin-bottom:4px;">Create a group</div>
@@ -1486,8 +1486,12 @@ function doLogout(){
 function _grpToken(){ try{ return (JSON.parse(localStorage.getItem('symbio_session')||'{}')).access_token || ''; }catch(e){ return ''; } }
 async function _grpCall(body){
   body.accessToken = _grpToken();
-  var r = await fetch('/.netlify/functions/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  return r.json();
+  try{
+    var r = await fetch('/.netlify/functions/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var t = await r.text();
+    try{ return JSON.parse(t); }
+    catch(e){ return {error:'Groups service not reachable (HTTP '+r.status+'). Make sure groups.js is deployed to netlify/functions/.'}; }
+  }catch(e){ return {error:'Network error reaching Groups service.'}; }
 }
 function openGroups(){ document.getElementById('groupsModal').style.display='flex'; grpRefresh(); }
 function closeGroups(){ document.getElementById('groupsModal').style.display='none'; }
@@ -1496,7 +1500,7 @@ function _grpEsc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':
 async function grpRefresh(){
   var el=document.getElementById('grpList'); el.textContent='Loading\u2026';
   var d=await _grpCall({action:'list_my_groups'});
-  if(d.error){ el.textContent=''; _grpSay(d.error,false); return; }
+  if(d.error){ el.innerHTML='<span style="color:#e88;">'+_grpEsc(d.error)+'</span>'; _grpSay(d.error,false); return; }
   if(!d.groups||!d.groups.length){ el.innerHTML='<span style="color:#888;">No groups yet. Create one or join with a code.</span>'; return; }
   el.innerHTML = d.groups.map(function(g){
     var code = g.invite_code ? '<div style="color:#888;font-size:11px;margin-top:2px;">invite code: <code style="color:#9c9;">'+_grpEsc(g.invite_code)+'</code></div>' : '';
