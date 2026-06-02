@@ -1483,14 +1483,20 @@ function doLogout(){
   </div>
 </div>
 <script>
-function _grpToken(){ try{ return (JSON.parse(localStorage.getItem('symbio_session')||'{}')).access_token || ''; }catch(e){ return ''; } }
+function _grpSess(){ try{ return JSON.parse(localStorage.getItem('symbio_session')||'{}'); }catch(e){ return {}; } }
 async function _grpCall(body){
-  body.accessToken = _grpToken();
+  var s = _grpSess();
+  body.accessToken = s.access_token || '';
+  body.refreshToken = s.refresh_token || '';
   try{
     var r = await fetch('/.netlify/functions/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     var t = await r.text();
-    try{ return JSON.parse(t); }
-    catch(e){ return {error:'Groups service not reachable (HTTP '+r.status+'). Make sure groups.js is deployed to netlify/functions/.'}; }
+    var d;
+    try{ d = JSON.parse(t); }
+    catch(e){ return {error:'Groups service not reachable (HTTP '+r.status+').'}; }
+    // Self-heal: if the server refreshed our token, store the new session for next calls.
+    if(d && d._session){ try{ localStorage.setItem('symbio_session', JSON.stringify(d._session)); }catch(e){} delete d._session; }
+    return d;
   }catch(e){ return {error:'Network error reaching Groups service.'}; }
 }
 function openGroups(){ document.getElementById('groupsModal').style.display='flex'; grpRefresh(); }
