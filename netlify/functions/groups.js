@@ -27,22 +27,45 @@ async function audit(actor, action, resource, detail) {
   try { await req('POST', SB_HOST(), '/rest/v1/audit_log', { ...SVC(), 'Prefer': 'return=minimal' }, { actor, action, resource: resource || null, detail: detail || null }); } catch(e) {}
 }
 
-// Verify the caller from their JWT. Returns canonical user_id or null. NEVER trusts the body.
-async function verifyUser(accessToken) {
-  if (!accessToken) return null;
-  try {
-    const u = await req('GET', SB_HOST(), '/auth/v1/user', { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` }, null);
-    if (u.status !== 200 || !u.body || !u.body.id) return null;
-    const sUid = u.body.id, email = u.body.email || '';
-    // Map verified auth identity -> canonical user_id via user_profiles (supabase_uid, then email).
-    let r = await req('GET', SB_HOST(), `/rest/v1/user_profiles?supabase_uid=eq.${encodeURIComponent(sUid)}&select=user_id&limit=1`, SVC(), null);
+// Map a verified auth identity (uid + email) -> canonical user_id via user_profiles.
+async function resolveProfile(sUid, email) {
+  let r = await req('GET', SB_HOST(), `/rest/v1/user_profiles?supabase_uid=eq.${encodeURIComponent(sUid)}&select=user_id&limit=1`, SVC(), null);
+  if (Array.isArray(r.body) && r.body[0] && r.body[0].user_id) return r.body[0].user_id;
+  if (email) {
+    r = await req('GET', SB_HOST(), `/rest/v1/user_profiles?email=eq.${encodeURIComponent(email)}&select=user_id&limit=1`, SVC(), null);
     if (Array.isArray(r.body) && r.body[0] && r.body[0].user_id) return r.body[0].user_id;
-    if (email) {
-      r = await req('GET', SB_HOST(), `/rest/v1/user_profiles?email=eq.${encodeURIComponent(email)}&select=user_id&limit=1`, SVC(), null);
-      if (Array.isArray(r.body) && r.body[0] && r.body[0].user_id) return r.body[0].user_id;
-    }
-  } catch(e) {}
+  }
   return null;
+}
+
+// Verify caller from their JWT. NEVER trusts the body. Self-heals stale tokens via refresh_token.
+// Returns { userId, session, reason }. session is non-null only when a refresh produced a new one.
+async function verifyUser(accessToken, refreshToken) {
+  if (!accessToken && !refreshToken) return { userId: null, session: null, reason: 'no_token' };
+  try {
+    // 1) Try the access token as-is.
+    if (accessToken) {
+      const u = await req('GET', SB_HOST(), '/auth/v1/user', { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` }, null);
+      if (u.status === 200 && u.body && u.body.id) {
+        const uid = await resolveProfile(u.body.id, u.body.email || '');
+        return uid ? { userId: uid, session: null, reason: null } : { userId: null, session: null, reason: 'no_profile' };
+      }
+    }
+    // 2) Access token missing/stale -> refresh server-side.
+    if (refreshToken) {
+      const rf = await req('POST', SB_HOST(), '/auth/v1/token?grant_type=refresh_token',
+        { 'apikey': process.env.SUPABASE_ANON_KEY }, { refresh_token: refreshToken });
+      if (rf.status === 200 && rf.body && rf.body.access_token && rf.body.user && rf.body.user.id) {
+        const uid = await resolveProfile(rf.body.user.id, rf.body.user.email || '');
+        if (!uid) return { userId: null, session: null, reason: 'no_profile' };
+        return { userId: uid, session: rf.body, reason: null }; // hand fresh session back to client
+      }
+      return { userId: null, session: null, reason: 'refresh_failed' };
+    }
+    return { userId: null, session: null, reason: 'token_rejected' };
+  } catch(e) {
+    return { userId: null, session: null, reason: 'verify_error' };
+  }
 }
 
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
@@ -56,11 +79,14 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return err('Method not allowed', 405);
 
   let p; try { p = JSON.parse(event.body || '{}'); } catch(e) { return err('Bad JSON'); }
-  const { action, accessToken } = p;
+  const { action, accessToken, refreshToken } = p;
 
-  // SECURE IDENTITY — every action requires a valid token.
-  const userId = await verifyUser(accessToken);
-  if (!userId) return err('Not authenticated', 401);
+  // SECURE IDENTITY — every action requires a valid token (self-heals stale tokens).
+  const v = await verifyUser(accessToken, refreshToken);
+  if (!v.userId) return err('auth_failed:' + (v.reason || 'unknown'), 401);
+  const userId = v.userId;
+  // If we refreshed, hand the new session back so the client can store it.
+  const finish = (obj) => ok(v.session ? Object.assign({}, obj, { _session: v.session }) : obj);
 
   const host = SB_HOST();
 
@@ -78,7 +104,7 @@ exports.handler = async (event) => {
       await req('POST', host, '/rest/v1/group_members', { ...SVC(), 'Prefer': 'return=minimal' },
         { group_id: group.id, user_id: userId, role: 'admin' });
       audit(userId, 'group_create', 'groups', type);
-      return ok({ group: { id: group.id, name: group.name, type: group.type, role: 'admin', invite_code: invite } });
+      return finish({ group: { id: group.id, name: group.name, type: group.type, role: 'admin', invite_code: invite } });
     }
 
     // ---- LIST MY GROUPS ----
@@ -93,7 +119,7 @@ exports.handler = async (event) => {
         // invite_code only revealed to admins
         invite_code: byId[x.id] === 'admin' ? x.invite_code : null
       }));
-      return ok({ groups });
+      return finish({ groups });
     }
 
     // ---- JOIN GROUP (by invite code) ----
@@ -107,7 +133,7 @@ exports.handler = async (event) => {
       await req('POST', host, '/rest/v1/group_members', { ...SVC(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
         { group_id: group.id, user_id: userId, role: 'member' });
       audit(userId, 'group_join', 'group_members', group.type);
-      return ok({ group: { id: group.id, name: group.name, type: group.type, role: 'member' } });
+      return finish({ group: { id: group.id, name: group.name, type: group.type, role: 'member' } });
     }
 
     // ---- LEAVE GROUP ----
@@ -116,7 +142,7 @@ exports.handler = async (event) => {
       if (!gid) return err('group_id required');
       await req('DELETE', host, `/rest/v1/group_members?group_id=eq.${encodeURIComponent(gid)}&user_id=eq.${encodeURIComponent(userId)}`, { ...SVC(), 'Prefer': 'return=minimal' }, null);
       audit(userId, 'group_leave', 'group_members', null);
-      return ok({ left: true });
+      return finish({ left: true });
     }
 
     // ---- POST GROUP NOTE (shared memory, scope='group') ----
@@ -137,7 +163,7 @@ exports.handler = async (event) => {
       if (embedding) row.embedding = embedding;
       await req('POST', host, '/rest/v1/memories', { ...SVC(), 'Prefer': 'return=minimal' }, row);
       audit(userId, 'group_note', 'memories', null);
-      return ok({ posted: true });
+      return finish({ posted: true });
     }
 
     return err('Unknown action');
