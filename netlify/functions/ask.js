@@ -25,7 +25,6 @@ function httpsGet(hostname, path, headers) {
   });
 }
 
-
 // Resolve ONE canonical user_id per human, so memory never scatters across
 // uid vs user_id. Looks up user_profiles by supabase_uid (the uid) and returns
 // the stable text user_id. Falls back to the explicit bodyUserId if given.
@@ -174,27 +173,6 @@ exports.handler = async (event) => {
     if (!isOwner && !userId) {
       return { statusCode: 200, headers: CORS,
         body: JSON.stringify({ reply: '⚠️ Please sign in — Symbio keeps each person\'s memory private and separate, so it needs your account first.' }) };
-    }
-
-    // DEBUG SWITCH (owner testing only — remove before public launch):
-    // send the exact message "__DEBUG__" to get a pipeline readout instead of a chat reply.
-    if (message.trim() === '__DEBUG__') {
-      let recentCount = -1, semErr = null;
-      try { const probe = await searchMemories('what do you remember about me', userId); recentCount = probe.length; }
-      catch(e){ semErr = e.message; }
-      let grpInfo = '';
-      try { const gmx = await getGroupMemories(userId); grpInfo = '\ngroup notes found: ' + gmx.length + (gmx.length ? ('\nfirst group note: ' + ((gmx[0].content||'').slice(0,40))) : ''); }
-      catch(e){ grpInfo = '\ngroup probe error: ' + e.message; }
-      return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply:
-        'DEBUG\n' +
-        'received uid: ' + (uid||'(none)') + '\n' +
-        'received bodyUserId: ' + (bodyUserId||'(none)') + '\n' +
-        'received userFirstName: ' + (userFirstName||'(none)') + '\n' +
-        'isOwner: ' + isOwner + '\n' +
-        'RESOLVED user_id: ' + (userId||'(none)') + '  [source: ' + resolved.source + ']\n' +
-        'resolved firstName: ' + (fname||'(none)') + '\n' +
-        'memories found for this user_id: ' + recentCount + (semErr ? ('\nsearch error: ' + semErr) : '') + grpInfo
-      }) };
     }
 
     const platformRules = `RESPONSE STYLE:
