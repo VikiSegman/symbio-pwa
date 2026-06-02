@@ -70,6 +70,26 @@ async function getSummary(userId) {
   return '';
 }
 
+// GROUP ROUTING (§4): a user sees memories shared to groups they belong to.
+// Group membership is resolved SERVER-SIDE from group_members (service key) — never client-controlled.
+// Cross-member access is impossible by design: a non-member's userId yields no group_ids -> nothing.
+// Returns [] when the user has no memberships, so this is inert until Family/Org is actually used.
+async function getGroupMemories(userId) {
+  try {
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
+    const gm = await httpsGet(host, `/rest/v1/group_members?user_id=eq.${encodeURIComponent(userId)}&select=group_id`, svc);
+    if (!Array.isArray(gm.body) || gm.body.length === 0) return [];
+    const ids = gm.body.map(r => r.group_id).filter(Boolean);
+    if (ids.length === 0) return [];
+    const inList = ids.map(encodeURIComponent).join(',');
+    // Most-recent group-shared memories for the user's groups (cap 3). scope='group' only.
+    const r = await httpsGet(host, `/rest/v1/memories?scope=eq.group&group_id=in.(${inList})&select=content,session_date&order=created_at.desc&limit=3`, svc);
+    if (Array.isArray(r.body)) return r.body;
+  } catch(e) {}
+  return [];
+}
+
 async function searchMemories(query, userId) {
   const host = new URL(process.env.SUPABASE_URL).hostname;
   const svcHeaders = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
@@ -180,9 +200,10 @@ exports.handler = async (event) => {
 
     // Phase 2 (AWARENESS): load the rolling profile + a little semantic memory.
     // If a profile exists, it carries "who they are" cheaply, so we pull fewer raw chats.
-    const [summary, memories] = await Promise.all([
+    const [summary, memories, groupMems] = await Promise.all([
       getSummary(userId).catch(() => ''),
-      searchMemories(message, userId).catch(() => [])
+      searchMemories(message, userId).catch(() => []),
+      getGroupMemories(userId).catch(() => [])   // §4: inert until the user belongs to a group
     ]);
     let memBlock = '';
     if (summary) memBlock += `\n\nKNOWN ABOUT USER:\n${summary}`;
@@ -190,6 +211,10 @@ exports.handler = async (event) => {
       // With a profile present, 2 most-relevant raw memories are plenty (token saving).
       const raw = summary ? memories.slice(0, 2) : memories;
       memBlock += `\n\nRELEVANT MEMORY:\n${raw.join('\n---\n')}`;
+    }
+    if (groupMems.length > 0) {
+      const shared = groupMems.map(m => `[${m.session_date || 'shared'}] ${m.content}`).join('\n---\n');
+      memBlock += `\n\nSHARED WITH YOUR GROUP:\n${shared}`;
     }
 
     let systemPrompt;
