@@ -1140,9 +1140,16 @@ function mdToSafeHtml(t){
   t = t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
   t = t.replace(/(^|[^*])\*([^*]+?)\*/g,'$1<i>$2</i>');
   t = t.replace(/`(.+?)`/g,'<code>$1</code>');
-  t = t.replace(/^[\-\*]\s+(.+)$/gm,'\u2022 $1');
-  t = t.replace(/\n/g,'<br>');
-  return t;
+  var lines = t.split('\n'); var out = [];
+  for (var i=0;i<lines.length;i++){
+    var ln = lines[i];
+    var h = ln.match(/^(#{1,6})\s+(.+)$/);
+    if (h){ out.push('<div style="font-weight:600;font-size:1.06em;margin:12px 0 5px;">'+h[2]+'</div>'); }
+    else if (/^\s*[\-\*\u2022]\s+/.test(ln)){ out.push('<div style="margin:3px 0 3px 8px;">\u2022 '+ln.replace(/^\s*[\-\*\u2022]\s+/,'')+'</div>'); }
+    else if (ln.trim()===''){ out.push('<div style="height:8px;"></div>'); }
+    else { out.push('<div style="margin:4px 0;">'+ln+'</div>'); }
+  }
+  return out.join('');
 }
 function addMsg(text, role){
   var m=document.getElementById('msgs');
