@@ -1606,4 +1606,52 @@ async function grpPostNote(id){
   } finally { _grpBusy=false; }
 }
 </script>
+  <!-- ===== SYMBIO • per-user projects (online) + compact rows ===== -->
+<style>
+.pr{padding:6px 12px}
+.pb{height:24px}
+.ps{margin-top:1px}
+#addProjBtn{display:block;width:calc(100% - 24px);margin:8px 12px;padding:7px;background:rgba(123,111,255,.15);border:1px solid rgba(123,111,255,.40);color:#cfc9ff;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit}
+#addProjBtn:hover{background:rgba(123,111,255,.28)}
+</style>
+<script>
+(function(){
+  function uid(){ return window._symbioUID || localStorage.getItem('symbio_uid') || ''; }
+  function box(){ return document.getElementById('tabPr'); }
+  function showTabBtn(){ var t=document.querySelector('.tb[data-tab="pr"]'); if(t) t.style.display=''; }
+  function makeBtn(){ var b=document.createElement('button'); b.id='addProjBtn'; b.textContent='+ פרויקט חדש'; b.onclick=createProject; return b; }
+  function ensureBtn(){ var b=box(); if(b && !document.getElementById('addProjBtn')) b.appendChild(makeBtn()); }
+  function render(list){
+    var b=box(); if(!b) return; b.innerHTML='';
+    (list||[]).forEach(function(p){
+      var row=document.createElement('div'); row.className='pr';
+      row.onclick=function(){ if(typeof pickProj==='function') pickProj(p.name, p.state||'idle'); };
+      var bar=document.createElement('div'); bar.className='pb'; bar.style.background=p.color||'#7B6FFF';
+      var info=document.createElement('div'); info.className='pi';
+      var nm=document.createElement('div'); nm.className='pn'; nm.textContent=p.name||'';
+      var sb=document.createElement('div'); sb.className='ps'; sb.textContent=p.sub||'';
+      info.appendChild(nm); info.appendChild(sb); row.appendChild(bar); row.appendChild(info); b.appendChild(row);
+    });
+    b.appendChild(makeBtn());
+  }
+  function createProject(){
+    var name=prompt('שם הפרויקט:'); if(!name) return;
+    var sub=prompt('תיאור קצר (לא חובה):')||'';
+    fetch('/.netlify/functions/projects-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid(),name:name,sub:sub})})
+      .then(function(r){return r.json();}).then(function(){ loadProjects(); })
+      .catch(function(){ alert('שמירה נכשלה — נסה שוב'); });
+  }
+  var done=false;
+  function loadProjects(){
+    var u=uid(); if(!u) return;
+    fetch('/.netlify/functions/projects-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:u})})
+      .then(function(r){return r.json();}).then(function(d){ done=true; render(d&&d.projects?d.projects:[]); })
+      .catch(function(){ ensureBtn(); });
+  }
+  function tick(){ showTabBtn(); if(!done) loadProjects(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', tick); else tick();
+  var n=0, iv=setInterval(function(){ tick(); if(++n>8) clearInterval(iv); }, 800);
+})();
+</script>
+<!-- ===== END SYMBIO projects ===== -->
 </body></html>
