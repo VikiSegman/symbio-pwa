@@ -1400,16 +1400,32 @@ async function checkOwner(){
     var uid=getOrCreateUID();
     var res=await fetch('/.netlify/functions/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid})});
     var d=await res.json();
-    applyOwnerUI(d.isOwner===true);
+    applyOwnerUI(d.isOwner===true, d);
   }catch(e){applyOwnerUI(false);}
 }
 
-function applyOwnerUI(isOwner){
+function renderOwnerProjects(projs){
+  var box=document.getElementById('tabPr'); if(!box||!Array.isArray(projs)) return;
+  box.innerHTML='';
+  projs.forEach(function(p){
+    var row=document.createElement('div'); row.className='pr';
+    row.onclick=function(){ if(typeof pickProj==='function') pickProj(p.name,p.state); };
+    var bar=document.createElement('div'); bar.className='pb'; bar.style.background=p.color||'#7B6FFF';
+    var info=document.createElement('div'); info.className='pi';
+    var nm=document.createElement('div'); nm.className='pn'; nm.textContent=p.name||'';
+    var sb=document.createElement('div'); sb.className='ps'; sb.textContent=p.sub||'';
+    info.appendChild(nm); info.appendChild(sb);
+    row.appendChild(bar); row.appendChild(info); box.appendChild(row);
+  });
+}
+function applyOwnerUI(isOwner, data){
   window._isOwner=isOwner;
   window._symbioUID=getOrCreateUID();
   if(isOwner){
     // Owner is always PRO — ensure tier badge reflects this
     loadPipelineAlerts();
+    if(data&&data.projects){renderOwnerProjects(data.projects);}
+    if(data&&data.metrics){var _mh=document.getElementById('mv3');if(_mh){_mh.textContent=data.metrics.hot;_mh.className='mv o';}var _ml=document.getElementById('mv4');if(_ml){_ml.textContent=data.metrics.leads;_ml.className='mv';}}
     if(localStorage.getItem('symbio_tier')!=='pro'){
       localStorage.setItem('symbio_tier','pro');
     }
