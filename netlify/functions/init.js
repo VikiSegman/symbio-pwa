@@ -1,5 +1,18 @@
 const https = require('https');
 
+// Owner-only dashboard data. Served ONLY when the server confirms the owner
+// (UID or OAuth email). Never included in responses to non-owners.
+const OWNER_DASHBOARD = {
+  projects: [
+    { name: 'Financia',  state: 'thinking', color: '#FF7A30', sub: 'תמ"א 38/2 · חוזים בתהליך' },
+    { name: 'Lotar',     state: 'learning', color: '#22D49A', sub: 'מועדון · אפריקה · מנשה' },
+    { name: 'Mortgage',  state: 'happy',    color: '#5A8FFF', sub: 'ניוס שכיט +10K ₪' },
+    { name: 'AAF',       state: 'speaking', color: '#FF4545', sub: 'קמפיין ניוס תרומות' },
+    { name: 'Tax Liens', state: 'idle',     color: '#7B6FFF', sub: '+Baltimore · 18%' }
+  ],
+  metrics: { hot: 3, leads: 3 }
+};
+
 function verifySupabaseToken(token) {
   return new Promise((resolve) => {
     try {
@@ -41,7 +54,7 @@ exports.handler = async (event) => {
     // Path 1: check by symbio_uid (existing flow)
     if (body.uid) {
       const isOwner = ownerUID.length > 0 && body.uid === ownerUID;
-      return { statusCode: 200, headers: cors, body: JSON.stringify({ isOwner }) };
+      return { statusCode: 200, headers: cors, body: JSON.stringify(Object.assign({ isOwner }, isOwner ? OWNER_DASHBOARD : {})) };
     }
 
     // Path 2: check by Supabase access token (post-OAuth flow)
@@ -51,7 +64,7 @@ exports.handler = async (event) => {
         const isOwner = userData.email.toLowerCase() === ownerEmail;
         // Return ownerUID so the frontend can store it
         return { statusCode: 200, headers: cors,
-          body: JSON.stringify({ isOwner, ownerUID: isOwner ? ownerUID : null }) };
+          body: JSON.stringify(Object.assign({ isOwner, ownerUID: isOwner ? ownerUID : null }, isOwner ? OWNER_DASHBOARD : {})) };
       }
     }
 
