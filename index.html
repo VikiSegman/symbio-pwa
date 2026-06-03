@@ -64,6 +64,10 @@ html,body{height:100%;overflow:hidden;background:#08091A;font-family:-apple-syst
 .pn{font-size:13px;font-weight:500;color:#E8E8F0}
 .ps{font-size:10px;color:rgba(255,255,255,.3);margin-top:3px}
 #msgs{flex:1 1 56%;min-height:0;overflow-y:auto;padding:6px 12px;display:flex;flex-direction:column;gap:5px}
+#msgs::-webkit-scrollbar,#cont::-webkit-scrollbar{width:9px}
+#msgs::-webkit-scrollbar-thumb,#cont::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:5px}
+#msgs::-webkit-scrollbar-thumb:hover,#cont::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.35)}
+#msgs,#cont{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent}
 .msg{padding:7px 11px;border-radius:8px;font-size:12px;line-height:1.5;max-width:88%;word-break:break-word}
 .msg.u{background:rgba(90,80,232,.2);border:1px solid rgba(90,80,232,.3);align-self:flex-end;direction:rtl}
 .msg.a{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);align-self:flex-start}
@@ -154,8 +158,8 @@ body.light #alertBanner{background:linear-gradient(135deg,#e74c3c,#c0392b);}
   <div id="mets">
     <div class="met"><div class="mv" id="mv1">07:00</div><div class="ml">יומי</div></div>
     <div class="met"><div class="mv g" id="mv2">—</div><div class="ml">pipeline</div></div>
-    <div class="met"><div class="mv o" id="mv3">3</div><div class="ml">רותחים</div></div>
-    <div class="met"><div class="mv" id="mv4">3</div><div class="ml">לידים</div></div>
+    <div class="met"><div class="mv" id="mv3">—</div><div class="ml">רותחים</div></div>
+    <div class="met"><div class="mv" id="mv4">—</div><div class="ml">לידים</div></div>
   </div>
   <div id="tabs">
     <div class="tb" data-tab="c" onclick="swTab(this)">תודעה</div>
@@ -165,13 +169,7 @@ body.light #alertBanner{background:linear-gradient(135deg,#e74c3c,#c0392b);}
     <div class="tb act" data-tab="pr" onclick="swTab(this)">פרויקטים</div>
   </div>
   <div id="cont">
-    <div id="tabPr">
-      <div class="pr" onclick="pickProj('Financia','thinking')"><div class="pb" style="background:#FF7A30"></div><div class="pi"><div class="pn">Financia</div><div class="ps">תמ&quot;א 38/2 · חוזים בתהליך</div></div></div>
-      <div class="pr" onclick="pickProj('Lotar','learning')"><div class="pb" style="background:#22D49A"></div><div class="pi"><div class="pn">Lotar</div><div class="ps">מועדון · אפריקה · מנשה</div></div></div>
-      <div class="pr" onclick="pickProj('Mortgage','happy')"><div class="pb" style="background:#5A8FFF"></div><div class="pi"><div class="pn">Mortgage</div><div class="ps">ניוס שכיט +10K ₪</div></div></div>
-      <div class="pr" onclick="pickProj('AAF','speaking')"><div class="pb" style="background:#FF4545"></div><div class="pi"><div class="pn">AAF</div><div class="ps">קמפיין ניוס תרומות</div></div></div>
-      <div class="pr" onclick="pickProj('Tax Liens','idle')"><div class="pb" style="background:#7B6FFF"></div><div class="pi"><div class="pn">Tax Liens</div><div class="ps">+Baltimore · 18%</div></div></div>
-    </div>
+    <div id="tabPr"></div>
     <div id="tabC" style="display:none;padding:10px 12px;overflow-y:auto;max-height:280px;"></div>
     <div id="tabI" style="display:none;padding:10px 12px;overflow-y:auto;max-height:280px;"></div>
     <div id="tabJ" style="display:none;padding:10px 12px;overflow-y:auto;max-height:280px;"></div>
@@ -1159,7 +1157,14 @@ function addMsg(text, role){
   if(role==='a'){ d.innerHTML=mdToSafeHtml(text); }
   else { d.textContent=text||'(empty)'; }
   m.appendChild(d);
-  m.scrollTop=m.scrollHeight;
+  if(role==='a'){
+    requestAnimationFrame(function(){
+      var top = d.getBoundingClientRect().top - m.getBoundingClientRect().top + m.scrollTop;
+      m.scrollTop = top - 6;
+    });
+  } else {
+    m.scrollTop = m.scrollHeight;
+  }
 }
 
 async function sendMsg(){
