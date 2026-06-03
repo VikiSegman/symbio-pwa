@@ -1132,12 +1132,25 @@ function toggleContinuous() {
 setTimeout(function(){ setConvState('dormant'); }, 500);
 
 // ============ CHAT — sendMsg + addMsg (required by buttons) ============
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function mdToSafeHtml(t){
+  t = escapeHtml(t || '(empty)');
+  t = t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  t = t.replace(/(^|[^*])\*([^*]+?)\*/g,'$1<i>$2</i>');
+  t = t.replace(/`(.+?)`/g,'<code>$1</code>');
+  t = t.replace(/^[\-\*]\s+(.+)$/gm,'\u2022 $1');
+  t = t.replace(/\n/g,'<br>');
+  return t;
+}
 function addMsg(text, role){
   var m=document.getElementById('msgs');
   if(!m){ console.error('[addMsg] msgs div not found'); return; }
   var d=document.createElement('div');
   d.className='msg '+role;
-  d.textContent=text||'(empty)';
+  if(role==='a'){ d.innerHTML=mdToSafeHtml(text); }
+  else { d.textContent=text||'(empty)'; }
   m.appendChild(d);
   m.scrollTop=m.scrollHeight;
 }
