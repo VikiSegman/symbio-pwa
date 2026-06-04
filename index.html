@@ -1654,4 +1654,63 @@ async function grpPostNote(id){
 })();
 </script>
 <!-- ===== END SYMBIO projects ===== -->
+<!-- ===== SYMBIO • Phase 2 (Auto): create a project from chat ===== -->
+<script>
+(function(){
+  function uid(){ return window._symbioUID || localStorage.getItem('symbio_uid') || ''; }
+  function box(){ return document.getElementById('tabPr'); }
+  function makeBtn(){
+    var b=document.createElement('button'); b.id='addProjBtn'; b.textContent='+ פרויקט חדש';
+    b.onclick=function(){ var n=prompt('שם הפרויקט:'); if(!n) return; var s=prompt('תיאור קצר (לא חובה):')||'';
+      fetch('/.netlify/functions/projects-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid(),name:n,sub:s})})
+        .then(function(r){return r.json();}).then(function(){ reload(); }).catch(function(){}); };
+    return b;
+  }
+  function render(list){
+    var b=box(); if(!b) return; b.innerHTML='';
+    (list||[]).forEach(function(p){
+      var row=document.createElement('div'); row.className='pr';
+      row.onclick=function(){ if(typeof pickProj==='function') pickProj(p.name,p.state||'idle'); };
+      var bar=document.createElement('div'); bar.className='pb'; bar.style.background=p.color||'#7B6FFF';
+      var info=document.createElement('div'); info.className='pi';
+      var nm=document.createElement('div'); nm.className='pn'; nm.textContent=p.name||'';
+      var sb=document.createElement('div'); sb.className='ps'; sb.textContent=p.sub||'';
+      info.appendChild(nm); info.appendChild(sb); row.appendChild(bar); row.appendChild(info); b.appendChild(row);
+    });
+    b.appendChild(makeBtn());
+  }
+  function reload(){ var u=uid(); if(!u) return;
+    fetch('/.netlify/functions/projects-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:u})})
+      .then(function(r){return r.json();}).then(function(d){ render(d&&d.projects?d.projects:[]); }).catch(function(){}); }
+  function toast(msg){
+    var t=document.createElement('div'); t.textContent=msg;
+    t.style.cssText='position:fixed;bottom:84px;right:20px;z-index:9999;background:rgba(34,212,154,.95);color:#02201a;font-weight:600;padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.35)';
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.transition='opacity .5s'; t.style.opacity='0'; setTimeout(function(){ t.remove(); },500); }, 2600);
+  }
+  var looksLikeCreate=/(?:צור|תצור|פתח|תפתח|הוסף|תוסיף|הקם|תקים)\s+פרוי?יקט|פרוי?יקט\s+חדש|(?:create|add|open|start|make|new)\s+(?:a\s+)?project/i;
+  var busy=false;
+  function maybeCreate(text){
+    if(busy || !text || !looksLikeCreate.test(text)) return;
+    var u=uid(); if(!u) return; busy=true;
+    fetch('/.netlify/functions/project-intent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:u,text:text})})
+      .then(function(r){return r.json();})
+      .then(function(d){ busy=false; if(d&&d.created&&d.project){ reload(); toast('✓ פרויקט נוצר: '+d.project.name); } })
+      .catch(function(){ busy=false; });
+  }
+  var of=window.fetch;
+  window.fetch=function(input,init){
+    try{
+      var url=(typeof input==='string')?input:((input&&input.url)||'');
+      if(url.indexOf('/functions/ask')>-1 && init && init.body){
+        var p=JSON.parse(init.body);
+        var txt=p.message||p.text||p.q||p.prompt||p.input||'';
+        if(txt) maybeCreate(txt);
+      }
+    }catch(e){}
+    return of.apply(this,arguments);
+  };
+})();
+</script>
+<!-- ===== END SYMBIO Phase 2 ===== -->
 </body></html>
