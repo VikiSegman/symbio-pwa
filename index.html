@@ -1713,9 +1713,9 @@ async function grpPostNote(id){
 })();
 </script>
 <!-- ===== END SYMBIO Phase 2 ===== -->
-<!-- ============ SYMBIO IN-APP INBOX (SECURED v3 — token identity) ============ -->
-<!-- Drop-in replacement: delete the old inbox block (BEGIN..END) and paste this once before </body>. -->
-<!-- Identity comes ONLY from the verified Supabase session token. No window uid, no client-supplied id. -->
+<!-- ============ SYMBIO IN-APP INBOX (SECURED v3-FINAL — reads symbio_session.access_token) ============ -->
+<!-- Drop-in replacement: delete the existing inbox block (BEGIN..END) and paste this once before </body>. -->
+<!-- Identity = the app's real Supabase JWT. Server verifies it and ignores any client uid. Function unchanged. -->
 <style>
 #sym-inbox-btn{position:fixed;right:18px;bottom:18px;width:52px;height:52px;border-radius:50%;background:#7B6FFF;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.28);z-index:9998}
 #sym-inbox-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:#FF4545;color:#fff;font-size:12px;line-height:20px;text-align:center;padding:0 5px;display:none}
@@ -1731,22 +1731,25 @@ async function grpPostNote(id){
 <div id="sym-inbox-panel"><h4>Symbio · Inbox</h4><div id="sym-inbox-list"><div class="sym-empty">Loading…</div></div></div>
 <script>
 (function(){
-var SB_REF='cvrrqosynekfxekxfjkt';
-// Identity = verified session token only. Try the Supabase client first, then its localStorage token.
+var REF='cvrrqosynekfxekxfjkt';
+function isJwt(s){ return typeof s==='string' && /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(s); }
 async function symToken(){
-try{ if(window.supabase&&window.supabase.auth&&window.supabase.auth.getSession){ var s=await window.supabase.auth.getSession(); if(s&&s.data&&s.data.session&&s.data.session.access_token) return s.data.session.access_token; } }catch(e){}
-try{
-var raw=localStorage.getItem('sb-'+SB_REF+'-auth-token'); if(!raw) return null;
-var o=JSON.parse(raw);
-return (o&&o.access_token) || (o&&o.currentSession&&o.currentSession.access_token) || (Array.isArray(o)&&o[0]) || null;
-}catch(e){ return null; }
+// 1) supabase-js client (auto-refreshes) if present
+try{ if(window.supabase&&window.supabase.auth&&window.supabase.auth.getSession){ var s=await window.supabase.auth.getSession(); var t=s&&s.data&&s.data.session&&s.data.session.access_token; if(isJwt(t)){ window.__SYM_TOKEN_SRC__='supabase.getSession'; return t; } } }catch(e){}
+// 2) app's own session object (confirmed location)
+try{ var o=JSON.parse(localStorage.getItem('symbio_session')||'null'); var a=o&&o.access_token; if(isJwt(a)){ window.__SYM_TOKEN_SRC__='symbio_session.access_token'; return a; } }catch(e){}
+// 3) supabase-js default storage key
+try{ var raw=localStorage.getItem('sb-'+REF+'-auth-token'); if(raw){ var p=JSON.parse(raw); var b=(p&&p.access_token)||(p&&p.currentSession&&p.currentSession.access_token)||(Array.isArray(p)&&p[0]); if(isJwt(b)){ window.__SYM_TOKEN_SRC__='sb-auth-token'; return b; } } }catch(e){}
+window.__SYM_TOKEN_SRC__='NONE'; return null;
 }
 var panel=document.getElementById('sym-inbox-panel'),btn=document.getElementById('sym-inbox-btn'),
 list=document.getElementById('sym-inbox-list'),badge=document.getElementById('sym-inbox-badge');
 function fmt(ts){ try{return new Date(ts).toLocaleString();}catch(e){return '';} }
 function empty(msg){ list.innerHTML=''; var e=document.createElement('div'); e.className='sym-empty'; e.textContent=msg; list.appendChild(e); }
 async function load(){
-var tok=await symToken(); if(!tok){ empty('Please sign in.'); return; }
+var tok=await symToken();
+try{ console.log('[symbio-inbox] token source:', window.__SYM_TOKEN_SRC__, '| found:', !!tok); }catch(e){}
+if(!tok){ empty('Please sign in.'); return; }
 try{
 var r=await fetch('/.netlify/functions/notifications-list',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:'{}'});
 var j=await r.json(); var notes=(j&&j.notifications)||[];
@@ -1764,7 +1767,7 @@ if(unread>0){ badge.style.display='block'; badge.textContent=unread>9?'9+':Strin
 }catch(e){ empty('Could not load inbox.'); }
 }
 btn.addEventListener('click',function(){ var open=panel.style.display==='block'; panel.style.display=open?'none':'block'; if(!open) load(); });
-setTimeout(load,1500); // initial badge check
+setTimeout(load,1500);
 })();
 </script>
 <!-- ============ END SYMBIO IN-APP INBOX ============ -->
