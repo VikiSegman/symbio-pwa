@@ -1,20 +1,25 @@
-exports.handler = async (event) => {
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SECRET_KEY;
+const ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+async function verifyOwner(event) {
   const ownerUID = (process.env.OWNER_UID || '').trim();
-  const auth = event.headers.authorization || event.headers.Authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  let verifiedUid = '';
-  if (token) {
-    try {
-      const uRes = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-        headers: { Authorization: `Bearer ${token}`, apikey: process.env.SUPABASE_SERVICE_KEY }
-      });
-      if (uRes.ok) { const u = await uRes.json(); verifiedUid = (u && u.id) ? u.id : ''; }
-    } catch (_) {}
-  }
-  if (!ownerUID || verifiedUid !== ownerUID) {
-    return { statusCode: 200,
-      headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body: JSON.stringify({ lines: [] }) };
+  const authz = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
+  const token = authz.startsWith('Bearer ') ? authz.slice(7) : '';
+  if (!token || !ownerUID) return false;
+  try {
+    const who = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: ANON_KEY || SERVICE_KEY, Authorization: `Bearer ${token}` }
+    });
+    if (!who.ok) return false;
+    const u = await who.json();
+    return !!(u && u.id) && u.id === ownerUID;
+  } catch (_) { return false; }
+}
+
+exports.handler = async (event) => {
+  if (!(await verifyOwner(event))) {
+    return { statusCode: 200, headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}, body: JSON.stringify({ lines: [] }) };
   }
   try {
     const token2 = process.env.NOTION_TOKEN;
