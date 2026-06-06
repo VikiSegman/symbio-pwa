@@ -1713,4 +1713,49 @@ async function grpPostNote(id){
 })();
 </script>
 <!-- ===== END SYMBIO Phase 2 ===== -->
+<!-- ============ SYMBIO IN-APP INBOX (append-only — paste once, just before </body>) ============ -->
+<!-- WIRING: reads the same user id source the Projects feature uses (window._symbioUID / localStorage 'symbio_uid'). -->
+<style>
+#sym-inbox-btn{position:fixed;right:18px;bottom:18px;width:52px;height:52px;border-radius:50%;background:#7B6FFF;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.28);z-index:9998}
+#sym-inbox-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:#FF4545;color:#fff;font-size:12px;line-height:20px;text-align:center;padding:0 5px;display:none}
+#sym-inbox-panel{position:fixed;right:18px;bottom:80px;width:340px;max-height:62vh;overflow:auto;background:#15151c;color:#e8e8f0;border:1px solid #2a2a36;border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:9999;display:none;font-family:inherit}
+#sym-inbox-panel h4{margin:2px 0 10px;font-size:14px;color:#b9b9c9}
+.sym-note{border:1px solid #2a2a36;border-radius:10px;padding:9px 10px;margin-bottom:8px;background:#1c1c25}
+.sym-note .t{font-size:13px;font-weight:600;color:#cfcadf;margin-bottom:3px}
+.sym-note .b{font-size:12px;white-space:pre-wrap;color:#aaa9bd;line-height:1.45}
+.sym-note .d{font-size:10px;color:#6f6f82;margin-top:5px}
+.sym-empty{font-size:12px;color:#6f6f82;text-align:center;padding:16px}
+</style>
+<button id="sym-inbox-btn" title="Symbio inbox">🔔<span id="sym-inbox-badge"></span></button>
+<div id="sym-inbox-panel"><h4>Symbio · Inbox</h4><div id="sym-inbox-list"><div class="sym-empty">Loading…</div></div></div>
+<script>
+(function(){
+function symUid(){ return window.__SYMBIO_UID__ || window._symbioUID || localStorage.getItem('symbio_uid') || window.symbioUid || null; } // wired to existing Projects user-id source
+var panel=document.getElementById('sym-inbox-panel'),btn=document.getElementById('sym-inbox-btn'),
+list=document.getElementById('sym-inbox-list'),badge=document.getElementById('sym-inbox-badge');
+function fmt(ts){ try{return new Date(ts).toLocaleString();}catch(e){return '';} }
+function empty(msg){ list.innerHTML=''; var e=document.createElement('div'); e.className='sym-empty'; e.textContent=msg; list.appendChild(e); }
+async function load(){
+var uid=symUid(); if(!uid){ empty('Not signed in.'); return; }
+try{
+var r=await fetch('/.netlify/functions/notifications-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid})});
+var j=await r.json(); var notes=(j&&j.notifications)||[];
+list.innerHTML='';
+if(!notes.length){ empty('No messages yet.'); }
+notes.forEach(function(n){
+var c=document.createElement('div'); c.className='sym-note';
+var t=document.createElement('div'); t.className='t'; t.textContent=n.title||n.faculty||'Symbio';
+var b=document.createElement('div'); b.className='b'; b.textContent=n.body||'';
+var d=document.createElement('div'); d.className='d'; d.textContent=fmt(n.created_at);
+c.appendChild(t); c.appendChild(b); c.appendChild(d); list.appendChild(c);
+});
+var unread=(j&&j.unread)||0;
+if(unread>0){ badge.style.display='block'; badge.textContent=unread>9?'9+':String(unread); } else { badge.style.display='none'; }
+}catch(e){ empty('Could not load inbox.'); }
+}
+btn.addEventListener('click',function(){ var open=panel.style.display==='block'; panel.style.display=open?'none':'block'; if(!open) load(); });
+setTimeout(load,1500); // initial badge check
+})();
+</script>
+<!-- ============ END SYMBIO IN-APP INBOX ============ -->
 </body></html>
