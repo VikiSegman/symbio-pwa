@@ -1713,8 +1713,9 @@ async function grpPostNote(id){
 })();
 </script>
 <!-- ===== END SYMBIO Phase 2 ===== -->
-<!-- ============ SYMBIO IN-APP INBOX (append-only — paste once, just before </body>) ============ -->
-<!-- WIRING: reads the same user id source the Projects feature uses (window._symbioUID / localStorage 'symbio_uid'). -->
+<!-- ============ SYMBIO IN-APP INBOX (SECURED v3 — token identity) ============ -->
+<!-- Drop-in replacement: delete the old inbox block (BEGIN..END) and paste this once before </body>. -->
+<!-- Identity comes ONLY from the verified Supabase session token. No window uid, no client-supplied id. -->
 <style>
 #sym-inbox-btn{position:fixed;right:18px;bottom:18px;width:52px;height:52px;border-radius:50%;background:#7B6FFF;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.28);z-index:9998}
 #sym-inbox-badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:#FF4545;color:#fff;font-size:12px;line-height:20px;text-align:center;padding:0 5px;display:none}
@@ -1730,15 +1731,24 @@ async function grpPostNote(id){
 <div id="sym-inbox-panel"><h4>Symbio · Inbox</h4><div id="sym-inbox-list"><div class="sym-empty">Loading…</div></div></div>
 <script>
 (function(){
-function symUid(){ return window.__SYMBIO_UID__ || window._symbioUID || localStorage.getItem('symbio_uid') || window.symbioUid || null; } // wired to existing Projects user-id source
+var SB_REF='cvrrqosynekfxekxfjkt';
+// Identity = verified session token only. Try the Supabase client first, then its localStorage token.
+async function symToken(){
+try{ if(window.supabase&&window.supabase.auth&&window.supabase.auth.getSession){ var s=await window.supabase.auth.getSession(); if(s&&s.data&&s.data.session&&s.data.session.access_token) return s.data.session.access_token; } }catch(e){}
+try{
+var raw=localStorage.getItem('sb-'+SB_REF+'-auth-token'); if(!raw) return null;
+var o=JSON.parse(raw);
+return (o&&o.access_token) || (o&&o.currentSession&&o.currentSession.access_token) || (Array.isArray(o)&&o[0]) || null;
+}catch(e){ return null; }
+}
 var panel=document.getElementById('sym-inbox-panel'),btn=document.getElementById('sym-inbox-btn'),
 list=document.getElementById('sym-inbox-list'),badge=document.getElementById('sym-inbox-badge');
 function fmt(ts){ try{return new Date(ts).toLocaleString();}catch(e){return '';} }
 function empty(msg){ list.innerHTML=''; var e=document.createElement('div'); e.className='sym-empty'; e.textContent=msg; list.appendChild(e); }
 async function load(){
-var uid=symUid(); if(!uid){ empty('Not signed in.'); return; }
+var tok=await symToken(); if(!tok){ empty('Please sign in.'); return; }
 try{
-var r=await fetch('/.netlify/functions/notifications-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid})});
+var r=await fetch('/.netlify/functions/notifications-list',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:'{}'});
 var j=await r.json(); var notes=(j&&j.notifications)||[];
 list.innerHTML='';
 if(!notes.length){ empty('No messages yet.'); }
