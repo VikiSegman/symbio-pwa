@@ -157,15 +157,14 @@ exports.handler = async (event) => {
     const verifiedSid = await verifyToken(event);
     if (!verifiedSid) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: SIGN_IN }) };
 
-    const ownerUID = (process.env.OWNER_UID || '').trim();
-    const isOwner = ownerUID.length > 0 && verifiedSid === ownerUID;
-
-    const resolved = await resolveUserId(verifiedSid, '');
+   const resolved = await resolveUserId(verifiedSid, '');
     const userId = resolved.userId;
     const fname = (userFirstName && userFirstName.trim()) ? userFirstName.trim() : resolved.firstName;
 
     if (!userId) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: SIGN_IN }) };
 
+    const OWNER_ID = process.env.OWNER_CANONICAL_ID || 'erez_segman_1779658339219';
+    const isOwner = userId === OWNER_ID;
     const platformRules = `RESPONSE STYLE:
 - 1-3 sentences MAX unless asked to expand.
 - Bullets: 3 words per bullet, max 5.
