@@ -10,6 +10,21 @@ function sb(method, path, body){
     req.on('error',()=>resolve(null)); if(data)req.write(data); req.end();
   }catch(e){resolve(null);} });
 }
+// FIX: identity from the caller's token (canonical) so created projects match what projects-list reads.
+async function resolveCanonical(event, bodyUid){
+  const token=(event.headers.authorization||event.headers.Authorization||'').replace(/^Bearer\s+/i,'');
+  if(token){
+    try{
+      const ures=await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:process.env.SUPABASE_ANON_KEY,Authorization:`Bearer ${token}`}});
+      const u=await ures.json();
+      if(u && u.id){
+        const prof=await sb('GET',`/rest/v1/user_profiles?supabase_uid=eq.${encodeURIComponent(u.id)}&select=user_id&limit=1`,null);
+        if(Array.isArray(prof)&&prof[0]&&prof[0].user_id) return prof[0].user_id;
+      }
+    }catch(e){}
+  }
+  return (bodyUid||'').trim(); // legacy fallback only if no token
+}
 function parseIntent(raw){
   if(!raw) return null;
   let t = String(raw).trim().replace(/^["'\u201C\u201D\s,.:;!-]+/, '');
@@ -23,11 +38,12 @@ function parseIntent(raw){
   return name.length < 2 ? null : name;
 }
 exports.handler = async (event)=>{
-  const cors={'Content-Type':'application/json','Access-Control-Allow-Origin':'*'};
+  const cors={'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization'};
   if(event.httpMethod==='OPTIONS') return {statusCode:200,headers:cors,body:''};
   if(event.httpMethod!=='POST') return {statusCode:405,headers:cors,body:'Method Not Allowed'};
   try{
-    const body=JSON.parse(event.body||'{}'); const uid=(body.uid||'').trim();
+    const body=JSON.parse(event.body||'{}');
+    const uid=await resolveCanonical(event, body.uid);
     const text=(body.text||body.message||'').toString();
     if(!uid) return {statusCode:200,headers:cors,body:JSON.stringify({created:false})};
     const name=parseIntent(text);
