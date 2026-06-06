@@ -21,8 +21,7 @@ function req(method, host, path, headers, body) {
 }
 
 const SB_HOST = () => new URL(process.env.SUPABASE_URL).hostname;
-const SVC = () => ({ 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` });
-
+const SVC = () => { const k = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SECRET_KEY; return { 'apikey': k, 'Authorization': `Bearer ${k}` }; };
 async function audit(actor, action, resource, detail) {
   try { await req('POST', SB_HOST(), '/rest/v1/audit_log', { ...SVC(), 'Prefer': 'return=minimal' }, { actor, action, resource: resource || null, detail: detail || null }); } catch(e) {}
 }
