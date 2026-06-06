@@ -1642,10 +1642,21 @@ async function grpPostNote(id){
       .catch(function(){ alert('שמירה נכשלה — נסה שוב'); });
   }
   var done=false;
+  function projToken(){
+    function isJwt(s){ return typeof s==='string' && /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(s); }
+    try{ var o=JSON.parse(localStorage.getItem('symbio_session')||'null'); var a=o&&o.access_token; if(isJwt(a)) return a; }catch(e){}
+    try{ var raw=localStorage.getItem('sb-cvrrqosynekfxekxfjkt-auth-token'); if(raw){ var p=JSON.parse(raw); var b=(p&&p.access_token)||(p&&p.currentSession&&p.currentSession.access_token); if(isJwt(b)) return b; } }catch(e){}
+    return '';
+  }
   function loadProjects(){
-    var u=uid(); if(!u) return;
-    fetch('/.netlify/functions/projects-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:u})})
-      .then(function(r){return r.json();}).then(function(d){ done=true; render(d&&d.projects?d.projects:[]); })
+    var tok = projToken(); if(!tok) return;
+    fetch('/.netlify/functions/projects-list',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+      body:'{}'
+    })
+      .then(function(r){return r.json();})
+      .then(function(d){ done=true; render(d && d.projects ? d.projects : []); })
       .catch(function(){ ensureBtn(); });
   }
   function tick(){ showTabBtn(); if(!done) loadProjects(); }
@@ -1679,8 +1690,14 @@ async function grpPostNote(id){
     });
     b.appendChild(makeBtn());
   }
-  function reload(){ var u=uid(); if(!u) return;
-    fetch('/.netlify/functions/projects-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:u})})
+  function projToken(){
+    function isJwt(s){ return typeof s==='string' && /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(s); }
+    try{ var o=JSON.parse(localStorage.getItem('symbio_session')||'null'); var a=o&&o.access_token; if(isJwt(a)) return a; }catch(e){}
+    try{ var raw=localStorage.getItem('sb-cvrrqosynekfxekxfjkt-auth-token'); if(raw){ var p=JSON.parse(raw); var b=(p&&p.access_token)||(p&&p.currentSession&&p.currentSession.access_token); if(isJwt(b)) return b; } }catch(e){}
+    return '';
+  }
+  function reload(){ var tok = projToken(); if(!tok) return;
+    fetch('/.netlify/functions/projects-list',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:'{}'})
       .then(function(r){return r.json();}).then(function(d){ render(d&&d.projects?d.projects:[]); }).catch(function(){}); }
   function toast(msg){
     var t=document.createElement('div'); t.textContent=msg;
