@@ -1,11 +1,3 @@
-
-ask.SECURED.js
-
-דף
-1
-/
-1
-100%
 const https = require('https');
 
 function httpsPost(hostname, path, headers, body) {
@@ -33,8 +25,6 @@ function httpsGet(hostname, path, headers) {
   });
 }
 
-// SECURED: verify the Supabase session token and return the authenticated supabase_uid.
-// Identity is taken ONLY from this verified token, never from the request body. No token -> ''.
 async function verifyToken(event) {
   const authz = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
   const token = authz.startsWith('Bearer ') ? authz.slice(7) : '';
@@ -49,7 +39,6 @@ async function verifyToken(event) {
   } catch (e) { return ''; }
 }
 
-// Resolve ONE canonical user_id per human via user_profiles lookup keyed by supabase_uid.
 async function resolveUserId(uid, bodyUserId) {
   const explicit = (bodyUserId || '').trim();
   const rawUid = (uid || '').trim();
@@ -87,7 +76,6 @@ async function getSummary(userId) {
   return '';
 }
 
-// GROUP ROUTING (§4): membership resolved SERVER-SIDE from group_members (service key), never client-controlled.
 async function getGroupMemories(userId) {
   try {
     const host = new URL(process.env.SUPABASE_URL).hostname;
@@ -163,18 +151,15 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    // Identity is NEVER taken from the body. Only message + display name are read from it.
     const { message, userFirstName } = JSON.parse(event.body || '{}');
     if (!message) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: 'No message received.' }) };
 
-    // SECURED IDENTITY (§1/§4): derive supabase_uid from the verified session token, not the body.
     const verifiedSid = await verifyToken(event);
     if (!verifiedSid) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: SIGN_IN }) };
 
     const ownerUID = (process.env.OWNER_UID || '').trim();
     const isOwner = ownerUID.length > 0 && verifiedSid === ownerUID;
 
-    // Canonical user_id for EVERYONE (owner included) via profile lookup keyed by the verified uid.
     const resolved = await resolveUserId(verifiedSid, '');
     const userId = resolved.userId;
     const fname = (userFirstName && userFirstName.trim()) ? userFirstName.trim() : resolved.firstName;
@@ -240,4 +225,3 @@ If you do not yet know something about ${name}, say so honestly and ask — neve
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: `⚠️ שגיאה: ${e.message}` }) };
   }
 };
-המערכת מציגה את ask.SECURED.js.
