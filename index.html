@@ -1,6 +1,26 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
+  <script>
+/* Symbio Unit 3: attach verified session token to backend calls */
+(function () {
+  if (window.__symbioFetchPatched) return;
+  window.__symbioFetchPatched = true;
+  var _fetch = window.fetch;
+  window.fetch = function (url, opts) {
+    try {
+      var u = (typeof url === 'string') ? url : (url && url.url) || '';
+      if (u.indexOf('/.netlify/functions/ask') !== -1 || u.indexOf('/.netlify/functions/memory-search') !== -1) {
+        var tok = '';
+        try { tok = JSON.parse(localStorage.getItem('symbio_session') || '{}').access_token || ''; } catch (e) {}
+        opts = opts || {};
+        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tok });
+      }
+    } catch (e) {}
+    return _fetch.call(this, url, opts);
+  };
+})();
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><circle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%236C47FF%22/></svg>">
 <script>
 // Cache buster v5 — runs before anything else
