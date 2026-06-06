@@ -1,23 +1,26 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
-  <script>
-/* Symbio Unit 3: attach verified session token to backend calls */
+ <script>
 (function () {
   if (window.__symbioFetchPatched) return;
   window.__symbioFetchPatched = true;
-  var _fetch = window.fetch;
-  window.fetch = function (url, opts) {
+  const _fetch = window.fetch;
+  window.fetch = function (input, init) {
     try {
-      var u = (typeof url === 'string') ? url : (url && url.url) || '';
-      if (u.indexOf('/.netlify/functions/ask') !== -1 || u.indexOf('/.netlify/functions/memory-search') !== -1) {
-        var tok = '';
-        try { tok = JSON.parse(localStorage.getItem('symbio_session') || '{}').access_token || ''; } catch (e) {}
-        opts = opts || {};
-        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + tok });
+      init = init || {};
+      const url = (typeof input === 'string') ? input : ((input && input.url) || '');
+      if (url.indexOf('/.netlify/functions/') !== -1) {
+        const headers = new Headers((init.headers) || {});
+        if (!headers.has('Authorization')) {
+          let tok = '';
+          try { tok = (JSON.parse(localStorage.getItem('symbio_session') || '{}').access_token) || ''; } catch (e) {}
+          if (tok) headers.set('Authorization', 'Bearer ' + tok);
+        }
+        init.headers = headers;
       }
     } catch (e) {}
-    return _fetch.call(this, url, opts);
+    return _fetch(input, init);
   };
 })();
 </script>
