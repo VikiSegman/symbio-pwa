@@ -4,7 +4,7 @@
 
 const NOTION_VERSION = '2022-06-28';
 const MASTER_CRM_ID = '65013e2e-2627-4a71-ac3b-bd212f5671e3';
-const DECISIONS_DB  = 'b5f664f6-b9e4-4ee0-b9c3-14e6c0ad4c8e';
+const DECISIONS_DB  = 'b5f664f6-14b4-4667-be32-d2db9b9cdb65'; // FIX 2026-06-07: was b5f664f6-b9e4… (no such source). Live OPEN DECISIONS source.
 
 // Stage options in Master CRM
 const STAGES = ['חדש', 'יצרנו קשר', 'מעוניין', 'הצעה נשלחה', 'סגור - שולם', 'קפא'];
@@ -36,8 +36,9 @@ async function saveDeal(deal, token) {
   return res.ok;
 }
 
-// Save decision to Decisions DB
+// Save decision to OPEN DECISIONS DB  (FIX 2026-06-07: correct property names + date)
 async function saveDecision(decision, token) {
+  const today = new Date().toISOString().slice(0, 10);
   const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: {
@@ -48,8 +49,9 @@ async function saveDecision(decision, token) {
     body: JSON.stringify({
       parent: { database_id: DECISIONS_DB },
       properties: {
-        'Name': { title: [{ text: { content: decision.slice(0, 100) } }] },
-        'Notes': { rich_text: [{ text: { content: decision } }] }
+        'Title': { title: [{ text: { content: decision.slice(0, 100) } }] },
+        'Decision': { rich_text: [{ text: { content: decision } }] },
+        'Date': { date: { start: today } }
       }
     })
   });
@@ -125,7 +127,6 @@ Rules:
   const text = data.content?.[0]?.text || '{}';
 
   try {
-    // Strip any accidental markdown
     const clean = text.replace(/```json|```/g, '').trim();
     return JSON.parse(clean);
   } catch(e) {
@@ -169,14 +170,12 @@ exports.handler = async (event) => {
     const notionToken = process.env.NOTION_TOKEN;
     if (!apiKey || !notionToken) return { statusCode: 200, headers: cors, body: JSON.stringify({ confirmation: '' }) };
 
-    // Run extraction
     const extracted = await extractEntities(userMessage, assistantReply, apiKey);
     if (!extracted) return { statusCode: 200, headers: cors, body: JSON.stringify({ confirmation: '' }) };
 
     const lang = detectLang(userMessage);
     const saved = [];
 
-    // Save deals
     for (const deal of (extracted.deals || [])) {
       if (deal.confidence >= 0.75 && deal.name) {
         const ok = await saveDeal(deal, notionToken);
@@ -184,7 +183,6 @@ exports.handler = async (event) => {
       }
     }
 
-    // Save contacts as deals with "חדש" stage (so they appear in CRM)
     for (const contact of (extracted.contacts || [])) {
       if (contact.confidence >= 0.75 && contact.name) {
         const ok = await saveDeal({
@@ -199,7 +197,6 @@ exports.handler = async (event) => {
       }
     }
 
-    // Save decisions
     for (const decision of (extracted.decisions || [])) {
       if (decision.confidence >= 0.75 && decision.text) {
         await saveDecision(decision.text, notionToken).catch(() => {});
