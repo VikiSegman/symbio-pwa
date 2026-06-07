@@ -1811,4 +1811,55 @@ setTimeout(load,1500);
 })();
 </script>
 <!-- ============ END SYMBIO IN-APP INBOX ============ -->
+<script>
+// === SYMBIO Ambient Capture — Smart Gate + extract.js wire-in (drop-in, no edits to sendMsg/voice) ===
+(function(){
+  var _lastHash = '';
+  function _hash(s){ var h=0,i,c; for(i=0;i<s.length;i++){c=s.charCodeAt(i);h=((h<<5)-h)+c;h|=0;} return h; }
+  function gate(msg){
+    if(!msg) return false;
+    var t=String(msg).trim();
+    var hsh=_hash(t); if(hsh===_lastHash) return false;                       // dedup
+    var w=t.split(/\s+/).filter(Boolean);
+    var ACK=/^(ok|okay|thanks|thank you|yes|no|yep|sure|👍|🙏|תודה|כן|לא|יופי|מעולה|אוקיי|בסדר|סבבה|הבנתי)$/i;
+    if(w.length<=3 && (ACK.test(t) || !/[A-Za-z\u0590-\u05FF0-9]/.test(t))) return false;  // trivial
+    var strong=/(\+?\d[\d\-\s]{7,}\d)|([\w.+-]+@[\w-]+\.[\w.-]+)|(₪|\$|\bNIS\b|אלף|מיליון|million|thousand)|(תוסיף|תרשום|הוסף|רשום|זכור|נסגר|סיכמנו|החלטתי|נפגש|פגישה|save|remember|decided|deal|meeting|signed|client|לקוח|עסקה|פרויקט|project)/i;
+    if(strong.test(t)){ _lastHash=hsh; return true; }                         // strong signal
+    var soft=/(בשם|שמו|שמה|פגשתי|מכיר|טלפון|נייד|מחר|היום|בשעה|עד\s|tomorrow|next week|at \d|by \d|[A-Z][a-z]+\s[A-Z][a-z]+)/;
+    if(soft.test(t)){ _lastHash=hsh; return true; }                           // soft signal
+    if(t.length>=120){ _lastHash=hsh; return true; }                          // gray-zone substantial
+    return false;
+  }
+  function runExtract(userMsg, reply){
+    try{
+      if(!gate(userMsg)) return;
+      var uid=window._symbioUID||localStorage.getItem('symbio_uid')||'';
+      if(!uid) return;
+      fetch('/.netlify/functions/extract',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({userMessage:userMsg,assistantReply:reply,uid:uid})})
+        .then(function(r){return r.json();})
+        .then(function(d){ if(d&&d.confirmation&&typeof addMsg==='function') addMsg(d.confirmation,'a'); })
+        .catch(function(){});
+    }catch(_){}
+  }
+  var _of=window.fetch;
+  window.fetch=function(input,init){
+    var url=(typeof input==='string')?input:((input&&input.url)||'');
+    var userMsg='';
+    if(url.indexOf('/functions/ask')>-1 && init && init.body){
+      try{ var p=JSON.parse(init.body); userMsg=p.message||p.text||''; }catch(e){}
+    }
+    var pr=_of.apply(this,arguments);
+    if(userMsg){
+      pr.then(function(res){
+        try{ res.clone().json().then(function(d){
+          var reply=(d&&(d.reply||d.error))||''; if(reply) runExtract(userMsg, reply);
+        }).catch(function(){}); }catch(_){}
+        return res;
+      });
+    }
+    return pr;
+  };
+})();
+</script>
 </body></html>
