@@ -1,0 +1,39 @@
+name: Sync source to Symbio registry
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:        # manual run = seed ALL tracked files
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: Pick files
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git ls-files '*.js' '*.html' '*.json' '*.md' > files.txt
+          else
+            git diff --name-only HEAD~1 HEAD -- '*.js' '*.html' '*.json' '*.md' > files.txt || true
+          fi
+          echo "count=$(wc -l < files.txt)" >> "$GITHUB_OUTPUT"
+      - name: Upsert into Symbio registry
+        if: steps.pick.outputs.count != '0'
+        env:
+          SB_URL: ${{ secrets.SUPABASE_URL }}
+          SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SHA: ${{ github.sha }}
+        run: |
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            jq -n --arg path "$f" --rawfile content "$f" --arg sha "$SHA" \
+              '{path:$path,content:$content,bytes:($content|length),sha:$sha,updated_by:"github-action"}' > payload.json
+            curl -sS -X POST "$SB_URL/rest/v1/symbio_source" \
+              -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: resolution=merge-duplicates" \
+              --data-binary @payload.json > /dev/null
+            echo "synced $f"
+          done < files.txt
+          
