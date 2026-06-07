@@ -1,9 +1,14 @@
 // summarize-user.js — Symbio AWARENESS layer (per-user rolling profile)
 // End-user only. 100% Supabase. NEVER writes to Notion or owner data.
-// Trigger: frontend pings at session end / pause with { uid, userId, messages }.
+// Trigger: frontend pings at session end / pause with { messages } + Bearer token.
 // Gate: only summarizes sessions with >= 4 messages.
+// HARDENED 2026-06-07 (Constitution B1/B2/B3): identity comes ONLY from the verified
+// auth token; client-supplied uid/userId is ignored; the profile NEVER records the
+// person's name/identity/ownership (prompt rule + post-process strip).
 
 const https = require('https');
+
+const SVC_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SECRET_KEY;
 
 function httpsReq(method, hostname, path, headers, body) {
   return new Promise((resolve, reject) => {
@@ -24,24 +29,43 @@ function httpsReq(method, hostname, path, headers, body) {
 async function audit(actor, action, resource, detail) {
   try {
     const host = new URL(process.env.SUPABASE_URL).hostname;
-    const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, 'Prefer': 'return=minimal' };
+    const svc = { 'apikey': SVC_KEY, 'Authorization': `Bearer ${SVC_KEY}`, 'Prefer': 'return=minimal' };
     await httpsReq('POST', host, '/rest/v1/audit_log', svc, { actor, action, resource: resource || null, detail: detail || null });
   } catch(e) {}
 }
 
-// Resolve canonical user_id (same model as ask.js).
-async function resolveUserId(uid, bodyUserId) {
-  const explicit = (bodyUserId || '').trim();
+// Verify the Supabase auth token -> authenticated uid. The ONLY source of identity.
+async function verifyToken(token) {
+  if (!token) return null;
+  try {
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const r = await httpsReq('GET', host, '/auth/v1/user',
+      { 'apikey': process.env.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` }, null);
+    if (r.status === 200 && r.body && r.body.id) return { uid: r.body.id, email: r.body.email || '' };
+  } catch(e) {}
+  return null;
+}
+
+// Resolve canonical user_id from the verified uid. No fallback to client-supplied ids.
+async function resolveCanonical(uid) {
   const rawUid = (uid || '').trim();
-  if (rawUid) {
-    try {
-      const host = new URL(process.env.SUPABASE_URL).hostname;
-      const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
-      const r = await httpsReq('GET', host, `/rest/v1/user_profiles?supabase_uid=eq.${encodeURIComponent(rawUid)}&select=user_id&limit=1`, svc, null);
-      if (Array.isArray(r.body) && r.body[0] && r.body[0].user_id) return r.body[0].user_id;
-    } catch(e) {}
-  }
-  return explicit || rawUid || '';
+  if (!rawUid) return '';
+  try {
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const svc = { 'apikey': SVC_KEY, 'Authorization': `Bearer ${SVC_KEY}` };
+    const r = await httpsReq('GET', host, `/rest/v1/user_profiles?supabase_uid=eq.${encodeURIComponent(rawUid)}&select=user_id&limit=1`, svc, null);
+    if (Array.isArray(r.body) && r.body[0] && r.body[0].user_id) return r.body[0].user_id;
+  } catch(e) {}
+  return '';
+}
+
+// Constitution B3: a profile must NEVER carry the person's name/identity. Strip such lines.
+function stripIdentityLines(text) {
+  return (text || '').split('\n').filter(line => {
+    const l = line.replace(/^[-*\s]+/, '').trim();
+    if (/^(name|full name|user(?:'s)? name|identity|who|שם|שם מלא|זהות|הזיהוי)\s*[:：]/i.test(l)) return false;
+    return true;
+  }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
@@ -51,21 +75,31 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const { uid, userId: bodyUserId, messages } = JSON.parse(event.body || '{}');
-    const _who = bodyUserId || uid || 'unknown';
-    audit(_who, 'summarize_invoked', 'summarize-user', 'msgs=' + (Array.isArray(messages) ? messages.length : 'na')).catch(() => {});
+    const { messages } = JSON.parse(event.body || '{}');
+
+    // Identity ONLY from the verified token. Client-supplied uid/userId is ignored.
+    const authHeader = event.headers.authorization || event.headers.Authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const auth = await verifyToken(token);
+    if (!auth) {
+      audit('anon', 'summarize_skip', 'no_auth', null).catch(() => {});
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'no auth' }) };
+    }
+
+    audit(auth.uid, 'summarize_invoked', 'summarize-user', 'msgs=' + (Array.isArray(messages) ? messages.length : 'na')).catch(() => {});
     if (!Array.isArray(messages) || messages.length < 4) {
-      audit(_who, 'summarize_skip', 'too_short', 'msgs=' + (Array.isArray(messages) ? messages.length : 'na')).catch(() => {});
+      audit(auth.uid, 'summarize_skip', 'too_short', 'msgs=' + (Array.isArray(messages) ? messages.length : 'na')).catch(() => {});
       return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'too short' }) };
     }
 
-    const ownerUID = (process.env.OWNER_UID || '').trim();
-    const isOwner  = ownerUID.length > 0 && uid === ownerUID;
-    const userId = isOwner ? 'erez' : await resolveUserId(uid, bodyUserId);
-    if (!userId) { audit(_who, 'summarize_skip', 'no_user', null).catch(() => {}); return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'no user' }) }; }
+    const userId = await resolveCanonical(auth.uid);
+    if (!userId) {
+      audit(auth.uid, 'summarize_skip', 'no_profile', null).catch(() => {});
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'no profile' }) };
+    }
 
     const host = new URL(process.env.SUPABASE_URL).hostname;
-    const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
+    const svc = { 'apikey': SVC_KEY, 'Authorization': `Bearer ${SVC_KEY}` };
 
     // Existing summary (if any).
     let prev = '';
@@ -78,10 +112,15 @@ exports.handler = async (event) => {
     const transcript = messages.slice(-30)
       .map(m => `${m.role === 'user' ? 'User' : 'Symbio'}: ${m.content}`).join('\n');
 
-    // Merge into an updated profile. Grounded: only user-stated facts, no guessing.
+    // Merge into an updated profile. Grounded: only user-stated facts, no identity.
     const prompt = `You maintain a concise private profile of a person, used by their personal AI to remember them.
 Update the profile using ONLY facts the user actually stated. Do not invent or guess. Keep it under 150 words.
-Write neutral third-person notes (preferences, goals, ongoing topics, important personal facts). Omit small talk.
+
+STRICT RULES:
+- NEVER record the person's name or identity. The system already knows who they are. Your job is only their topics, preferences, goals, and personal facts.
+- NEVER attribute a project, business, or goal to a named person. Write "interested in X", never "X belongs to <name>".
+- Do not copy any personal name that appears in the conversation into the profile.
+- Write neutral third-person notes (preferences, goals, ongoing topics, important personal facts). Omit small talk.
 
 EXISTING PROFILE:
 ${prev || '(none yet)'}
@@ -95,8 +134,12 @@ Return ONLY the updated profile text, nothing else.`;
       { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       { model: 'claude-haiku-4-5', max_tokens: 400, messages: [{ role: 'user', content: prompt }] });
 
-    const newSummary = (ai.body && ai.body.content && ai.body.content[0] && ai.body.content[0].text || '').trim();
-    if (!newSummary) { audit(userId, 'summarize_skip', 'ai_empty', 'aiStatus=' + (ai.status || '?')).catch(() => {}); return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'summarize failed' }) }; }
+    const rawSummary = (ai.body && ai.body.content && ai.body.content[0] && ai.body.content[0].text || '').trim();
+    const newSummary = stripIdentityLines(rawSummary);
+    if (!newSummary) {
+      audit(userId, 'summarize_skip', 'ai_empty', 'aiStatus=' + (ai.status || '?')).catch(() => {});
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ updated: false, reason: 'summarize failed' }) };
+    }
 
     // Upsert (PK = user_id). Prefer: resolution=merge-duplicates updates the row.
     const upHeaders = { ...svc, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' };
