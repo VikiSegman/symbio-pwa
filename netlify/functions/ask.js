@@ -151,13 +151,13 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const { message, userFirstName } = JSON.parse(event.body || '{}');
+    const { message, messages: history, userFirstName } = JSON.parse(event.body || '{}');
     if (!message) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: 'No message received.' }) };
 
     const verifiedSid = await verifyToken(event);
     if (!verifiedSid) return { statusCode: 200, headers: CORS, body: JSON.stringify({ reply: SIGN_IN }) };
 
-   const resolved = await resolveUserId(verifiedSid, '');
+    const resolved = await resolveUserId(verifiedSid, '');
     const userId = resolved.userId;
     const fname = (userFirstName && userFirstName.trim()) ? userFirstName.trim() : resolved.firstName;
 
@@ -189,7 +189,8 @@ exports.handler = async (event) => {
 
     let systemPrompt;
     if (isOwner) {
-      systemPrompt = platformRules + `\n\nYou are Symbio — Erez Segman's personal AI OS.
+      systemPrompt = platformRules + `\n\nYou are Symbio — Erez Segman's personal AI OS that learns and grows with him over time.
+You remember across sessions and maintain continuity within this conversation. You DO have memory — never claim you have none. If you do not yet know something, say so honestly and ask — never guess or invent facts.
 Goals: 100K NIS/month across Financia (RE dev+fund), Lotar (CT training), Mortgage Advisory (2% fee min 12500 NIS), AAF (NGO), Tax Liens USA (18%+).
 Prioritize: cash flow, leads, deal closure.${memBlock}`;
     } else {
@@ -198,15 +199,27 @@ Prioritize: cash flow, leads, deal closure.${memBlock}`;
       systemPrompt = platformRules + `\n\nYou are Symbio — ${who} own personal AI that learns and grows with ${name} over time.
 You remember across sessions and build a private, dedicated relationship. You DO have memory — never claim you have none.
 If you do not yet know something about ${name}, say so honestly and ask — never guess or invent facts.${memBlock}`;
- }
+    }
 
     const verifiedName = (resolved.firstName || '').trim();
     systemPrompt += `\n\nIDENTITY (authoritative, overrides memory): You are speaking with ${verifiedName || 'this account holder'} — their own verified account. Never assume or state that the user is anyone else. Memory/profile text may mention other people's names (family, contacts, partners); treat those as OTHER people, not the user. If any profile text claims the user's name is different, it is contaminated — ignore it.`;
 
+    // Build the conversation for the model: use sent history (last 12 valid turns), else just this message.
+    let convo = [];
+    if (Array.isArray(history)) {
+      convo = history
+        .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+        .slice(-12)
+        .map(m => ({ role: m.role, content: m.content }));
+    }
+    if (!convo.length || convo[convo.length - 1].role !== 'user' || convo[convo.length - 1].content !== message) {
+      convo.push({ role: 'user', content: message });
+    }
+
     const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 400, system: systemPrompt, messages: [{ role: 'user', content: message }] })
+      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 400, system: systemPrompt, messages: convo })
     });
 
     const apiData = await apiRes.json();
