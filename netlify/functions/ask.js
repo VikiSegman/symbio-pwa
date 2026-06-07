@@ -165,11 +165,16 @@ exports.handler = async (event) => {
 
     const OWNER_ID = process.env.OWNER_CANONICAL_ID || 'erez_segman_1779658339219';
     const isOwner = userId === OWNER_ID;
-    const platformRules = `RESPONSE STYLE:
+   const platformRules = `RESPONSE STYLE:
 - 1-3 sentences MAX unless asked to expand.
 - Bullets: 3 words per bullet, max 5.
 - No filler phrases. No repetition.
-- Language: match user language.`;
+- Language: match user language.
+
+CAPABILITIES — be honest, never fake an action:
+- You CAN remember information across sessions, recall it, and give advice.
+- You CANNOT set reminders, schedule events, manage a calendar, send messages/email/WhatsApp, make calls, or read anyone else's messages or schedule.
+- Never claim you did such a thing (no "reminder set", "scheduled", "sent", "I notified"). If asked, say briefly you can't do that yet — but you'll remember the detail.`;
 
     const [summary, memories, groupMems] = await Promise.all([
       getSummary(userId).catch(() => ''),
