@@ -93,6 +93,15 @@ async function getGroupMemories(userId) {
   return [];
 }
 
+async function getProjects(userId) {
+  try {
+    const host = new URL(process.env.SUPABASE_URL).hostname;
+    const svc = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
+    const r = await httpsGet(host, `/rest/v1/user_projects?user_id=eq.${encodeURIComponent(userId)}&is_synthetic=eq.false&select=name,sub&order=sort.asc,created_at.asc`, svc);
+    if (Array.isArray(r.body)) return r.body;
+  } catch(e) {}
+  return [];
+}
 async function searchMemories(query, userId) {
   const host = new URL(process.env.SUPABASE_URL).hostname;
   const svcHeaders = { 'apikey': process.env.SUPABASE_SERVICE_KEY, 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}` };
