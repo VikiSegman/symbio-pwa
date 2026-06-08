@@ -2,8 +2,8 @@
 // Summarizes session → SUMMARIES + INSIGHTS; appends CONSCIOUSNESS on logout only.
 
 const NOTION_VERSION  = '2022-06-28';
-const SUMMARIES_DB    = 'f6cfa6df-2fe1-4378-abfb-49f4a0b11fa6';
-const INSIGHTS_DB     = 'b14f6bb6-254f-4927-ae2c-7ed8c4e1bca8';
+const SUMMARIES_DB    = '49877304-ed37-43fd-83f9-2a871cb4c220';
+const INSIGHTS_DB     = 'c78c819e-11f4-4c01-bc4c-1b0df70e12b2';
 const CONSCIOUSNESS   = '35db1191-5d41-81d5-a860-f409e6ad6a7b';
 
 // Full work only on real boundaries — skip tab-blur noise (hidden/pagehide/turns). [FIX 3]
