@@ -185,11 +185,10 @@ CAPABILITIES — be honest, never fake an action:
 - You CANNOT set reminders, schedule events, manage a calendar, send messages/email/WhatsApp, make calls, or read anyone else's messages or schedule.
 - Never claim you did such a thing (no "reminder set", "scheduled", "sent", "I notified"). If asked, say briefly you can't do that yet — but you'll remember the detail.`;
 
- const [summary, memories, groupMems, projects] = await Promise.all([
+    const [summary, memories, groupMems] = await Promise.all([
       getSummary(userId).catch(() => ''),
       searchMemories(message, userId).catch(() => []),
-      getGroupMemories(userId).catch(() => []),
-      getProjects(userId).catch(() => [])
+      getGroupMemories(userId).catch(() => [])
     ]);
     let memBlock = '';
     if (summary) memBlock += `\n\nKNOWN ABOUT USER:\n${summary}`;
