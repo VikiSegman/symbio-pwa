@@ -111,8 +111,11 @@ async function saveAlertsToNotion(alerts, token) {
     headers: { 'Authorization': `Bearer ${token}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       parent: { database_id: ACTION_LOG_DB },
-      properties: {
-        'Name': { title: [{ text: { content: `🚨 Pipeline Alert — ${today} (${alerts.length} items)` } }] },
+    properties: {
+        'Title': { title: [{ text: { content: `🚨 Pipeline Alert — ${today} (${alerts.length} items)` } }] },
+        'Action Type': { select: { name: 'ALERT_USER' } },
+        'Result': { select: { name: 'הצלחה' } },
+        'Timestamp': { date: { start: today } },
         'Notes': { rich_text: [{ text: { content: summary.slice(0, 2000) } }] }
       }
     })
