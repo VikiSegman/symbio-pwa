@@ -4,7 +4,7 @@
 
 const NOTION_VERSION = '2022-06-28';
 const MASTER_CRM     = '65013e2e-2627-4a71-ac3b-bd212f5671e3';
-const ACTION_LOG_DB  = 'fd9d5f7a-f8f2-4fc9-9c19-20fe2a1e6daa';
+const ACTION_LOG_DB  = 'fd9d5f7a-ed64-4ecb-bb57-d710e9bf3d04'; // FIX 2026-06-07: was f8f2… (no such source)
 const CONSCIOUSNESS  = '35db1191-5d41-81d5-a860-f409e6ad6a7b';
 
 const COLD_DAYS = 14;   // deal flagged cold after 14 days no movement
