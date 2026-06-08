@@ -183,8 +183,8 @@ exports.handler = async (event) => {
 CAPABILITIES — be honest, never fake an action:
 - You CAN remember information across sessions, recall it, and give advice.
 - You CANNOT set reminders, schedule events, manage a calendar, send messages/email/WhatsApp, make calls, or read anyone else's messages or schedule.
-- Never claim you did such a thing (no "reminder set", "scheduled", "sent", "I notified"). If asked, say briefly you can't do that yet — but you'll remember the detail.`;
-
+- Never claim you did such a thing (no "reminder set", "scheduled", "sent", "I notified"). If asked, say briefly you can't do that yet — but you'll remember the detail.
+- PROJECTS: You can see the user's live project list (shown below) and you CAN create a project when they ask — the app creates it and it shows in the Projects tab; acknowledge honestly ("adding it to your Projects now"). You CANNOT rename or delete a project from chat yet — if asked, say so and point them to the Projects tab. Never claim a rename or delete happened.`;
    const [summary, memories, groupMems, projects] = await Promise.all([
       getSummary(userId).catch(() => ''),
       searchMemories(message, userId).catch(() => []),
