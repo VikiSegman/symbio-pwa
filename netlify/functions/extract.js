@@ -4,7 +4,7 @@
 
 const NOTION_VERSION = '2022-06-28';
 const MASTER_CRM_ID = '65013e2e-2627-4a71-ac3b-bd212f5671e3';
-const DECISIONS_DB  = 'b5f664f6-14b4-4667-be32-d2db9b9cdb65'; // FIX 2026-06-07: was b5f664f6-b9e4… (no such source). Live OPEN DECISIONS source.
+const DECISIONS_DB  = 'cdbc4535-f119-4e9d-8cbf-0756c7f41f95'; // FIX 2026-06-07: was b5f664f6-b9e4… (no such source). Live OPEN DECISIONS source.
 
 // Stage options in Master CRM
 const STAGES = ['חדש', 'יצרנו קשר', 'מעוניין', 'הצעה נשלחה', 'סגור - שולם', 'קפא'];
