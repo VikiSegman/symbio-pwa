@@ -173,18 +173,19 @@ exports.handler = async (event) => {
     const extracted = await extractEntities(userMessage, assistantReply, apiKey);
     if (!extracted) return { statusCode: 200, headers: cors, body: JSON.stringify({ confirmation: '' }) };
 
-    const lang = detectLang(userMessage);
+   const lang = detectLang(userMessage);
     const saved = [];
+    const savedNames = new Set();
 
     for (const deal of (extracted.deals || [])) {
       if (deal.confidence >= 0.75 && deal.name) {
         const ok = await saveDeal(deal, notionToken);
-        if (ok) saved.push({ type: 'deal', name: deal.name, project: deal.project, value: deal.value });
+        if (ok) { saved.push({ type: 'deal', name: deal.name, project: deal.project, value: deal.value }); savedNames.add(deal.name.trim().toLowerCase()); }
       }
     }
 
     for (const contact of (extracted.contacts || [])) {
-      if (contact.confidence >= 0.75 && contact.name) {
+      if (contact.confidence >= 0.75 && contact.name && !savedNames.has(contact.name.trim().toLowerCase())) {
         const ok = await saveDeal({
           name: contact.name,
           project: contact.project || 'Other',
