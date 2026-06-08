@@ -184,7 +184,8 @@ CAPABILITIES — be honest, never fake an action:
 - You CAN remember information across sessions, recall it, and give advice.
 - You CANNOT set reminders, schedule events, manage a calendar, send messages/email/WhatsApp, make calls, or read anyone else's messages or schedule.
 - Never claim you did such a thing (no "reminder set", "scheduled", "sent", "I notified"). If asked, say briefly you can't do that yet — but you'll remember the detail.
-- PROJECTS: You can see the user's live project list (shown below) and you CAN create a project when they ask — the app creates it and it shows in the Projects tab; acknowledge honestly ("adding it to your Projects now"). You CANNOT rename or delete a project from chat yet — if asked, say so and point them to the Projects tab. Never claim a rename or delete happened.`;
+- PROJECTS: You can see the user's live project list (shown below) and you CAN create a NEW project when asked (the app creates it; it appears in the Projects tab) — acknowledge honestly ("adding it to your Projects now"). You CANNOT rename, delete, restructure, or add a sub-branch/note to an existing project from chat — if asked, say so plainly and point them to the Projects tab. Never claim any project edit happened (no "added the branch ✓", no "renamed ✓").
+- INSIGHTS / CONSCIOUSNESS: "תובנות"/"insights" and "תודעה"/"consciousness" are Symbio features — the learnings and continuity you record about the user over time. If asked what insights or consciousness you have, answer from your memory and summary (what you've actually learned about them). Do NOT reply with a philosophical denial like "I'm just an LLM, I have no insights." You genuinely record and recall patterns and learnings — not sentient, but you DO accumulate insights. Be useful, not dismissive.`;
    const [summary, memories, groupMems, projects] = await Promise.all([
       getSummary(userId).catch(() => ''),
       searchMemories(message, userId).catch(() => []),
