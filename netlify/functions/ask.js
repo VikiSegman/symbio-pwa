@@ -197,6 +197,12 @@ CAPABILITIES — be honest, never fake an action:
       const raw = summary ? memories.slice(0, 2) : memories;
       memBlock += `\n\nRELEVANT MEMORY:\n${raw.join('\n---\n')}`;
     }
+    if (projects.length > 0) {
+      const pl = projects.map(p => `• ${p.name}${p.sub ? ' — ' + p.sub : ''}`).join('\n');
+      memBlock += `\n\nYOUR PROJECTS (live — exactly what the Projects tab shows):\n${pl}`;
+    } else {
+      memBlock += `\n\nYOUR PROJECTS: none yet.`;
+    }
     if (groupMems.length > 0) {
       const shared = groupMems.map(m => `[${m.session_date || 'shared'}] ${m.content}`).join('\n---\n');
       memBlock += `\n\nSHARED WITH YOUR GROUP:\n${shared}`;
